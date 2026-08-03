@@ -43,7 +43,7 @@ const PhysicalDao = () => {
               { title: "Manages real-world events and spaces", body: "Each Convergence Layer is responsible for a specific event or space — covering venue rental, physical access, equipment, logistics, and any other real-world assets needed to make it happen. Multiple Convergence Layers can exist simultaneously, each one operating independently once created." },
               { title: "Spawned by Idea Layers, not created directly", body: "A Convergence Layer can only come into existence after an Idea Layer proposes it and the Primary Layer approves. This means every physical event in the ecosystem has roots in a community-driven idea, not a top-down directive." },
               { title: "Sells cultural artefacts on behalf of creators", body: "Creators can designate a Convergence Layer as an operator for their NFTs, turning events into exchange platforms for cultural artefact sales. Creators retain independent selling rights — their work is not locked into the system — but the Convergence Layer facilitates sales at the event and distributes income according to a preset split." },
-              { title: "Bridges on-chain governance and off-chain law", body: "Because Convergence Layers interact with real-world jurisdictions — contracts, venues, legal entities — each one is assigned a Legal Representative by the Primary Layer. This person acts as the bridge between the on-chain governance structure and the legal frameworks of the physical world, and holds the power to pause or unpause the layer's operations." },
+              { title: "Bridges on-chain governance and off-chain law", body: "Because Convergence Layers interact with real-world jurisdictions — contracts, venues, legal entities — each one is assigned a Legal Interfacer by the Primary Layer. This person acts as the bridge between the on-chain governance structure and the legal frameworks of the physical world, and holds the power to pause or unpause the layer's operations." },
             ].map((c) => (
               <div key={c.title} className="border border-foreground/15 p-4">
                 <h3 className="text-sm mb-1">{c.title}</h3>
@@ -71,8 +71,8 @@ const PhysicalDao = () => {
           <div className="border border-foreground/15">
             {[
               { name: "Attendees", text: "Participants who have attended an event and hold a recently issued token from the Convergence Layer. Attendees gain formal governance rights — including the power to vote on Merit Token proposals and to initiate governance changes. Attendance Badges are valid for 15 days after issuance for the purpose of claiming membership." },
-              { name: "Conveners", text: "Up to three per Convergence Layer, selected through a Peer Selection process. Conveners handle the day-to-day running of events: paying expenses, minting and distributing Attendance Badges, selling artefacts, and proposing Merit Token awards. They are nominated by the public and elected by Attendees." },
-              { name: "Legal Representatives", text: "Assigned by the Primary Layer to handle off-chain legal responsibilities. They vet and manage Convener nominations, and hold a critical power: they can adopt or revoke the set of executive mandates — effectively pausing or resuming the Convergence Layer's operations. Must be over 18 and based in an eligible jurisdiction (currently GBR)." },
+              { name: "Session Stewards", text: "Up to three per Convergence Layer, selected through a Peer Selection process. Session Stewards handle the day-to-day running of events: paying expenses, minting and distributing Attendance Badges, selling artefacts, and proposing Merit Token awards. They are nominated by the public and elected by Attendees." },
+              { name: "Legal Interfacers", text: "Assigned by the Primary Layer to handle off-chain legal responsibilities. They vet and manage Session Steward nominations, and hold a critical power: they can adopt or revoke the set of executive mandates — effectively pausing or resuming the Convergence Layer's operations. Must be over 18 and based in an eligible jurisdiction (currently GBR)." },
             ].map((r, i, arr) => (
               <div
                 key={r.name}
@@ -90,8 +90,8 @@ const PhysicalDao = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { step: "As a visitor", title: "Just show up", body: "Attend a physical event. No wallet or prior involvement needed to experience the space." },
-              { step: "As a participant", title: "Collect your badge", body: "Receive an Attendance Badge (POAP) from a Convener at the event. This token activates your governance rights within the Convergence Layer, and can later be used to apply for Primary Layer membership." },
-              { step: "As a contributor", title: "Earn Merit Tokens", body: "Go beyond attending — contribute to the event. Conveners can nominate you for a Merit Token, which Attendees vote to award. Merit Tokens can be redeemed for a financial reward by burning them on-chain." },
+              { step: "As a participant", title: "Collect your badge", body: "Receive an Attendance Badge (POAP) from a Session Steward at the event. This token activates your governance rights within the Convergence Layer, and can later be used to apply for Primary Layer membership." },
+              { step: "As a contributor", title: "Earn Merit Tokens", body: "Go beyond attending — contribute to the event. Session Stewards can nominate you for a Merit Token, which Attendees vote to award. Merit Tokens can be redeemed for a financial reward by burning them on-chain." },
             ].map((s) => (
               <div key={s.step} className="border border-foreground/15 p-4">
                 <p className="text-xs opacity-60 mb-1">{s.step}</p>
@@ -106,7 +106,7 @@ const PhysicalDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Tokens you can earn</h2>
           <div className="border border-foreground/15">
             {[
-              { pill: "Attendance Badge", text: "A POAP issued by Conveners at the event. Valid for 15 days for claiming membership in the Convergence Layer. Can also be used to apply for Primary Layer membership — making it a passport into the broader governance ecosystem." },
+              { pill: "Attendance Badge", text: "A POAP issued by Session Stewards at the event. Valid for 15 days for claiming membership in the Convergence Layer. Can also be used to apply for Primary Layer membership — making it a passport into the broader governance ecosystem." },
               { pill: "Merit Token", text: "A soulbound token awarded for active contributions at an event. Unlike the Attendance Badge, Merit Tokens have real financial value — burning one on-chain triggers an automatic release of funds to your wallet from the treasury." },
             ].map((t, i, arr) => (
               <div
@@ -124,12 +124,12 @@ const PhysicalDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Checks and balances</h2>
           <div className="space-y-2">
             <div className="border border-foreground/15 p-4">
-              <h3 className="text-sm mb-1">Attendees initiate, Primary Layer can veto, Conveners execute</h3>
-              <p className="text-sm leading-relaxed opacity-70">Governance changes in a Convergence Layer follow a three-stage flow. Attendees propose them (requiring high threshold and quorum), the Primary Layer has a window to veto, and Conveners execute if no veto is cast. This layered structure keeps community voice central while maintaining constitutional oversight.</p>
+              <h3 className="text-sm mb-1">Attendees initiate, Primary Layer can veto, Session Stewards execute</h3>
+              <p className="text-sm leading-relaxed opacity-70">Governance changes in a Convergence Layer follow a three-stage flow. Attendees propose them (requiring high threshold and quorum), the Primary Layer has a window to veto, and Session Stewards execute if no veto is cast. This layered structure keeps community voice central while maintaining constitutional oversight.</p>
             </div>
             <div className="border border-foreground/15 p-4">
-              <h3 className="text-sm mb-1">Legal Representatives act as a pause mechanism</h3>
-              <p className="text-sm leading-relaxed opacity-70">If real-world legal or compliance concerns arise, Legal Representatives can revoke the executive mandates — effectively pausing all operational activity in the Convergence Layer until conditions are resolved and mandates are re-adopted.</p>
+              <h3 className="text-sm mb-1">Legal Interfacers act as a pause mechanism</h3>
+              <p className="text-sm leading-relaxed opacity-70">If real-world legal or compliance concerns arise, Legal Interfacers can revoke the executive mandates — effectively pausing all operational activity in the Convergence Layer until conditions are resolved and mandates are re-adopted.</p>
             </div>
           </div>
         </section>

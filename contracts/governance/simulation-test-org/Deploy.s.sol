@@ -13,12 +13,9 @@ import { PowersTypes } from "@lib/powers-monorepo/solidity/src/interfaces/Powers
 import { Powers } from "@lib/powers-monorepo/solidity/src/Powers.sol";
 import { IPowers } from "@lib/powers-monorepo/solidity/src/interfaces/IPowers.sol";
 
-import { Soulbound1155 } from "@lib/powers-monorepo/solidity/test/mocks/Soulbound1155.sol";
-
-import { Governed721 } from "@lib/powers-monorepo/solidity/src/addons/helpers/Governed721.sol";
 import { Nominees } from "@lib/powers-monorepo/solidity/src/core/helpers/Nominees.sol";
 import { ElectionRegistry } from "@lib/powers-monorepo/solidity/src/core/helpers/ElectionRegistry.sol";
-import { PowersFactory } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersFactory.sol"; 
+import { PowersFactory } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersFactory.sol";
 import { PowersDeployer } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersDeployer.sol";
 import { PowersPaymaster } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersPaymaster.sol";
 
@@ -28,45 +25,50 @@ import { DigitalLayer } from "./DigitalLayer.s.sol";
 import { IdeasLayer } from "./IdeasLayer.s.sol";
 import { ConvergenceLayer } from "./ConvergenceLayer.s.sol";
 
-/// @title Cultural Stewards DAO - Deployment Script
-/// Note: all days are turned into minutes for testing purposes. These should be changed before production deployment: ctrl-f minutesToBlocks -> daysToBlocks.
+/// @title Simulation Test Org - Deployment Script
+/// @notice Top-level orchestrator: deploys Helpers, then Primary -> Digital -> Ideas ->
+/// Convergence in dependency order. Derived from the Cultural Stewardship DAO's Deploy.s.sol.
+/// Changes (see Spec.md):
+///  - No `zkPassport_PowersRegistry` wiring anywhere — this org has no ZKPassport dependency.
+///  - No `Soulbound1155`/`Governed721` deployment and no ownership-transfer lines for them
+///    (Helpers.s.sol only deploys `ElectionRegistry` and `Nominees`).
+///  - Safe treasury and `PowersPaymaster` deployment/funding are KEPT (account abstraction is
+///    explicitly required for this org — gasless transactions for the live demo).
+///  - This script stays focused on constitution only. Seeding the two demo Ideas Layers named
+///    "Yin" and "Yang" is done separately via `actions/InitialiseRunner.s.sol`, run repeatedly
+///    after this script (its phases are gated by real voting-period/timelock windows, which
+///    cannot be fast-forwarded on a live testnet) — see README.md's deployment walkthrough.
 contract Deploy is Script {
     PrimaryLayer primaryLayer;
     DigitalLayer digitalLayer;
     IdeasLayer ideasLayerFactory;
     ConvergenceLayer convergenceLayerFactory;
-    Helpers helpers; 
-    address zkPassport_PowersRegistry; 
-    
-    string[] public ideasLayerNames = ["Seeing", "Making", "Listening", "Telling", "Remembering", "Imagining", "Tending"];
-    
-    function run() external returns (address primaryAddress, address digitalAddress, address ideasLayerFactoryAddress, address convergenceLayerFactoryAddress) { 
-        // step 1, setup. 
+    Helpers helpers;
+
+    /// @notice The two Ideas Layers pre-seeded for the live demo — see Spec.md "Demo Setup".
+    /// Actual creation happens post-deploy via actions/InitialiseRunner.s.sol, not in this script.
+    string[] public ideasLayerNames = ["Yin", "Yang"];
+
+    function run() external returns (address primaryAddress, address digitalAddress, address ideasLayerFactoryAddress, address convergenceLayerFactoryAddress) {
+        // step 1, setup.
         primaryLayer = new PrimaryLayer();
         digitalLayer = new DigitalLayer();
         ideasLayerFactory = new IdeasLayer();
         convergenceLayerFactory = new ConvergenceLayer();
         helpers = new Helpers();
-        zkPassport_PowersRegistry = 0xc554958CE7559eCcD08AEdbB8b72B1BE54Fde9ed; 
 
-        uint256[] memory privateKeys = new uint256[](3);
-        privateKeys[0] = vm.envUint("TEST_ACCOUNT_KEY_1");
-        privateKeys[1] = vm.envUint("TEST_ACCOUNT_KEY_2");
-        privateKeys[2] = vm.envUint("TEST_ACCOUNT_KEY_3");
-
-        // step 2, deploying the core Powers and Powers factory instances: 
+        // step 2, deploying the core Powers and Powers factory instances:
         primaryLayer.run();
         digitalLayer.run();
         ideasLayerFactory.run();
         convergenceLayerFactory.run();
         helpers.run();
 
-        // step 3, constituting the powers instances and powers factories. 
+        // step 3, constituting the powers instances and powers factories.
         primaryLayer.constitutePowers(
             digitalLayer.getAddress(),
             ideasLayerFactory.getAddress(),
             convergenceLayerFactory.getAddress(),
-            helpers.getActivityToken(),
             helpers.getElectionRegistry(),
             digitalLayer.getAssignConvergenceLayer()
         );
@@ -78,31 +80,24 @@ contract Deploy is Script {
         ideasLayerFactory.constitutePowers(
             primaryLayer.getAddress(),
             helpers.getElectionRegistry(),
-            zkPassport_PowersRegistry, 
             primaryLayer.getTreasury(),
             primaryLayer.requestParticipantpowersId(),
             primaryLayer.requestNewConvergenceLayerId()
         );
         convergenceLayerFactory.constitutePowers(
             primaryLayer.getAddress(),
-            helpers.getGoverned721(),
-            zkPassport_PowersRegistry, 
-            helpers.getActivityToken(),
             helpers.getNominees(),
-            primaryLayer.mintPoapTokenId(),
             primaryLayer.requestAllowanceConvergenceLayerId()
-
         );
 
-        // step 4: transfer ownership of factories to Primary Layer.
+        // step 4: transfer ownership of helper contracts to Primary Layer.
         vm.startBroadcast();
-        console2.log("Transferring ownership of Organisational factories to Primary Layer...");
-        Soulbound1155(helpers.getActivityToken()).transferOwnership(primaryLayer.getAddress());
-        Governed721(helpers.getGoverned721()).transferOwnership(primaryLayer.getAddress());
+        console2.log("Transferring ownership of Organisational helper contracts to Primary Layer...");
         Nominees(helpers.getNominees()).transferOwnership(primaryLayer.getAddress());
         vm.stopBroadcast();
- 
-        console2.log("Success! All contracts successfully deployed.");
+
+        console2.log("Success! All contracts successfully deployed and constituted.");
+        console2.log("Next step: run actions/InitialiseRunner.s.sol repeatedly to seed the 'Yin' and 'Yang' Ideas Layers (see README.md).");
 
         return (primaryLayer.getAddress(), digitalLayer.getAddress(), ideasLayerFactory.getAddress(), convergenceLayerFactory.getAddress());
     }

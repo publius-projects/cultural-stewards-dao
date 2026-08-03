@@ -51,7 +51,7 @@ const PrimaryDao = () => {
               },
               {
                 title: "Holds veto power",
-                body: "The Primary Layer Executives can veto mandate changes proposed by any other layer. This acts as a constitutional check — other layers have operational freedom, but cannot make changes that conflict with the broader ecosystem's direction.",
+                body: "The Primary Layer Primary Stewards can veto mandate changes proposed by any other layer. This acts as a constitutional check — other layers have operational freedom, but cannot make changes that conflict with the broader ecosystem's direction.",
               },
               {
                 title: "Manages tokens and metadata",
@@ -84,12 +84,12 @@ const PrimaryDao = () => {
           <div className="border border-foreground/15">
             {[
               {
-                name: "Members",
-                text: "Participants with voting rights in the Primary Layer. Can initiate proposals, veto actions, and nominate candidates for Executive elections. Membership is always earned indirectly — you must first contribute in one of the other layers.",
+                name: "Primary Participants",
+                text: "Participants with voting rights in the Primary Layer. Can initiate proposals, veto actions, and nominate candidates for Primary Steward elections. Membership is always earned indirectly — you must first contribute in one of the other layers.",
               },
               {
-                name: "Executives",
-                text: "Elected from among Members on a rotating basis. Responsible for executing high-level decisions — creating new layers, granting allowances, vetoing mandates, and managing the treasury. Roles are non-exclusive: an Executive retains their Member rights.",
+                name: "Primary Stewards",
+                text: "Elected from among Primary Participants on a rotating basis. Responsible for executing high-level decisions — creating new layers, granting allowances, vetoing mandates, and managing the treasury. Roles are non-exclusive: a Primary Steward retains their Primary Participant rights.",
               },
               {
                 name: "Recognised layers (as roles)",
@@ -108,7 +108,7 @@ const PrimaryDao = () => {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xs tracking-widest opacity-50 uppercase">How do you become a Member?</h2>
+          <h2 className="text-xs tracking-widest opacity-50 uppercase">How do you become a Primary Participant?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="border border-foreground/15 p-4">
               <p className="text-xs opacity-60 mb-1">Path A</p>
@@ -128,11 +128,11 @@ const PrimaryDao = () => {
           <div className="space-y-2">
             <div className="border border-foreground/15 p-4">
               <h3 className="text-sm mb-1">Adopting new mandates requires broad consensus</h3>
-              <p className="text-sm leading-relaxed opacity-70">For the Primary Layer to change its own governance rules, the proposal must clear multiple veto gates: Members, Digital Layer, Idea Layer, and Convergence Layer each have the right to block adoption before Executives can finalise it. This prevents unilateral changes to the constitutional framework.</p>
+              <p className="text-sm leading-relaxed opacity-70">For the Primary Layer to change its own governance rules, the proposal must clear multiple veto gates: Primary Participants, Digital Layer, Idea Layer, and Convergence Layer each have the right to block adoption before Primary Stewards can finalise it. This prevents unilateral changes to the constitutional framework.</p>
             </div>
             <div className="border border-foreground/15 p-4">
-              <h3 className="text-sm mb-1">A Vote of No Confidence can remove all Executives</h3>
-              <p className="text-sm leading-relaxed opacity-70">If the Members collectively lose trust in the elected Executives, they can trigger a Vote of No Confidence (requiring a high threshold and quorum) to revoke all Executive roles simultaneously and reset the leadership.</p>
+              <h3 className="text-sm mb-1">A Vote of No Confidence can remove all Primary Stewards</h3>
+              <p className="text-sm leading-relaxed opacity-70">If the Primary Participants collectively lose trust in the elected Primary Stewards, they can trigger a Vote of No Confidence (requiring a high threshold and quorum) to revoke all Primary Steward roles simultaneously and reset the leadership.</p>
             </div>
           </div>
         </section>

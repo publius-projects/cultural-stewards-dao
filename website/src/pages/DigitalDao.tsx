@@ -42,7 +42,7 @@ const DigitalDao = () => {
             {[
               { title: "Owns and maintains the codebase", body: "The Digital Layer owns the GitHub repository containing the code for every online interface in the ecosystem — including the UI experiences used at physical events. All of this is managed in a single repository, making it the shared technical foundation everything else depends on." },
               { title: "Pays for digital work", body: "The Digital Layer has two routes for compensating contributors: retroactive payment (submitting a receipt for work already done) and project funding (proposing a budget for work not yet started). Both routes draw from an allowance granted by the Primary Layer's central treasury — the Digital Layer holds no funds of its own." },
-              { title: "A meritocratic community of builders", body: "Membership is earned through verified code contributions. Anyone can make commits to the GitHub repository and, if accepted, claim a Member role on-chain. Leadership — the Repository Admins — is elected by Members from among themselves on a rotating basis." },
+              { title: "A meritocratic community of builders", body: "Membership is earned through verified code contributions. Anyone can make commits to the GitHub repository and, if accepted, claim a Member role on-chain. Leadership — the Repository Stewards — are elected by Members from among themselves on a rotating basis." },
               { title: "Subject to Primary Layer oversight", body: "Unlike the Idea Layer, the Digital Layer cannot change its own governance rules unilaterally. The Primary Layer retains the right to veto any mandate adoption proposals, ensuring the technical infrastructure stays aligned with the broader ecosystem's constitutional framework." },
             ].map((c) => (
               <div key={c.title} className="border border-foreground/15 p-4">
@@ -70,8 +70,8 @@ const DigitalDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Roles inside the Digital Layer</h2>
           <div className="border border-foreground/15">
             {[
-              { name: "Members", text: "Participants who have made verified commits to the repository and claimed their on-chain role. They can vote on funding proposals, initiate governance changes, veto membership revocations, nominate themselves in elections, and vote on who becomes a Repository Admin." },
-              { name: "Repository Admins", text: "Elected from among Members to lead the Digital Layer's operations. They approve receipts and project funding, request allowances from the Primary Layer, execute governance changes, and hold admin rights on the GitHub repository itself. If a Repository Admin loses their role on-chain, their GitHub admin rights are automatically revoked." },
+              { name: "Members", text: "Participants who have made verified commits to the repository and claimed their on-chain role. They can vote on funding proposals, initiate governance changes, veto membership revocations, nominate themselves in elections, and vote on who becomes a Repository Steward." },
+              { name: "Repository Stewards", text: "Elected from among Members to lead the Digital Layer's operations. They approve receipts and project funding, request allowances from the Primary Layer, execute governance changes, and hold admin rights on the GitHub repository itself. If a Repository Steward loses their role on-chain, their GitHub admin rights are automatically revoked." },
             ].map((r, i, arr) => (
               <div
                 key={r.name}
@@ -105,8 +105,8 @@ const DigitalDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">How payments work</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { tag: "Retroactive", title: "Receipt payments", body: "For work already completed. Anyone — including non-members — can submit a receipt. A Repository Admin reviews and approves it, then payment is released from the treasury allowance." },
-              { tag: "Prospective", title: "Project funding", body: "For work not yet started. Members propose a project and budget, which is put to a vote. If approved by Repository Admins, funding is released in advance of the work being done." },
+              { tag: "Retroactive", title: "Receipt payments", body: "For work already completed. Anyone — including non-members — can submit a receipt. A Repository Steward reviews and approves it, then payment is released from the treasury allowance." },
+              { tag: "Prospective", title: "Project funding", body: "For work not yet started. Members propose a project and budget, which is put to a vote. If approved by Repository Stewards, funding is released in advance of the work being done." },
             ].map((p) => (
               <div key={p.tag} className="border border-foreground/15 p-4">
                 <p className="text-xs opacity-60 mb-1">{p.tag}</p>
@@ -122,11 +122,11 @@ const DigitalDao = () => {
           <div className="space-y-2">
             <div className="border border-foreground/15 p-4">
               <h3 className="text-sm mb-1">Members can veto allowance requests</h3>
-              <p className="text-sm leading-relaxed opacity-70">When Repository Admins want to request additional funds from the Primary Layer, Members have the power to block the request before it is submitted. This ensures the community retains a check on how resources are pursued.</p>
+              <p className="text-sm leading-relaxed opacity-70">When Repository Stewards want to request additional funds from the Primary Layer, Members have the power to block the request before it is submitted. This ensures the community retains a check on how resources are pursued.</p>
             </div>
             <div className="border border-foreground/15 p-4">
               <h3 className="text-sm mb-1">A Vote of No Confidence can reset leadership</h3>
-              <p className="text-sm leading-relaxed opacity-70">If Members lose confidence in the elected Repository Admins, they can trigger a Vote of No Confidence — requiring a high threshold and quorum — to immediately revoke all Repository Admin roles and launch a fresh election.</p>
+              <p className="text-sm leading-relaxed opacity-70">If Members lose confidence in the elected Repository Stewards, they can trigger a Vote of No Confidence — requiring a high threshold and quorum — to immediately revoke all Repository Steward roles and launch a fresh election.</p>
             </div>
           </div>
         </section>

@@ -5,9 +5,10 @@ libs = ["lib"]
 evm_version = "cancun"
 always_use_create_2_factory = true
 create2_deployer = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+solc_version = "0.8.30"
 
 memory_limit = 1342177280
-optimizer_runs = 200
+optimizer_runs = 600
 # dynamic_test_linking = true
 # Auto-detect Solidity versions from pragma statements
 auto_detect_solc = true
@@ -25,15 +26,17 @@ remappings = [
     "@lib/openzeppelin-contracts/=lib/openzeppelin-contracts/",
     "@lib/powers-monorepo/=lib/powers-monorepo/",
     "@lib/safe-smart-account/=lib/safe-smart-account/",
-    "@lib/account-abstraction/=lib/account-abstraction/",
+    "@lib/account-abstraction/=lib/powers-monorepo/solidity/lib/account-abstraction/",
     "@lib/forge-std/=lib/forge-std/",
-    "@lib/circuits/=lib/circuits/",
-    "@lib/zkpassport-packages/=lib/circuits/src/solidity/lib/zkpassport-packages/",
+    "@lib/zkpassport-packages/=lib/powers-monorepo/solidity/lib/zkpassport-packages/",
     "@lib/chainlink-evm/=lib/chainlink-evm/",
+    "@mocks/=lib/powers-monorepo/solidity/test/mocks/",
     "@src/=lib/powers-monorepo/solidity/src/",
     "@script/=lib/powers-monorepo/solidity/script",
+    "@governance-monorepo/=lib/powers-monorepo/solidity/governance/",
+    "forge-std/=lib/powers-monorepo/solidity/lib/forge-std/src/",
     "@governance/=governance/"
-] 
+]
 
 [fmt]
 bracket_spacing = true

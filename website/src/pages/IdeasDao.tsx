@@ -42,7 +42,7 @@ const IdeasDao = () => {
             <p className="text-sm opacity-70">Pick a layer below and complete the form to join the conversation.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {ideasLayers.map(({ n, title, actions, participants, uriDescription }) => (
+            {ideasLayers.map(({ n, title, uriDescription }) => (
               <a
                 key={n}
                 href={`https://powers-utils.vercel.app/CS-signup?index=${signupIndex[title] ?? ""}`}
@@ -61,15 +61,9 @@ const IdeasDao = () => {
                   />
                 </div>
                 <h3 className="text-xl font-bold">{title}</h3>
-                <p className="text-base opacity-70">
-                  <span className="font-bold">Idea Layer ID:</span> {n}
-                </p>
                 <p className="text-base opacity-70">{uriDescription}</p>
                 <p className="text-base opacity-70">
-                  <span className="font-bold">Actions:</span> {actions}
-                </p>
-                <p className="text-base opacity-70">
-                  <span className="font-bold">Participants:</span> {participants}
+                  <span className="font-bold">Actions:</span> Stay tuned...
                 </p>
               </a>
             ))}
@@ -100,7 +94,7 @@ const IdeasDao = () => {
           <div className="space-y-2">
             {[
               { title: "A space for incubation", body: "The Idea Layer has no treasury and holds no financial assets. Its currency is social capital — ideas, knowledge, relationships, and engagement. This freedom from financial stakes makes it a low-pressure space to explore and develop cultural concepts without bureaucratic overhead." },
-              { title: "The birthplace of Convergence Layers", body: "Only an Idea Layer can propose the creation of a new Convergence Layer. Members initiate the request, Moderators can veto it, and Conveners forward the proposal to the Primary Layer for final approval. No other part of the ecosystem has this power." },
+              { title: "The birthplace of Convergence Layers", body: "Only an Idea Layer can propose the creation of a new Convergence Layer. Members initiate the request, Assessors can veto it, and Ideas Stewards forward the proposal to the Primary Layer for final approval. No other part of the ecosystem has this power." },
               { title: "A gateway to the Primary Layer", body: "Active contributors in an Idea Layer can earn Election Tokens, which can be used to apply for membership of the Primary Layer. The Idea Layer acts as a talent pipeline — surfacing engaged participants and elevating them into the broader governance structure." },
               { title: "Highly self-governing", body: "Unlike other layers, the Idea Layer can adopt and revoke its own mandates without any veto from the Primary Layer. It defines who gets a voice, how discussions are moderated, and how it evolves — entirely from within." },
             ].map((c) => (
@@ -116,9 +110,9 @@ const IdeasDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Roles inside the Idea Layer</h2>
           <div className="border border-foreground/15">
             {[
-              { name: "Members", text: "Participants with voting rights. Membership is granted by Moderators following a public application. Members can vote on proposals, nominate themselves for Convener elections, veto role changes, and apply for Primary Layer membership." },
-              { name: "Moderators", text: "Appointed by Conveners to manage community standards and the membership process. They review applications, assign and revoke Member roles, and can veto proposals to create a new Convergence Layer. They can also forward Primary Layer membership requests on behalf of Members." },
-              { name: "Conveners", text: "Elected from among Members every 3 months — up to 3 at a time, for a maximum of 2 terms each. They lead the Idea Layer operationally: updating metadata, assigning Moderators, requesting new Convergence Layers, and executing mandate changes. No Convener exists at the point of creation — the first must be elected after launch." },
+              { name: "Ideas Participants", text: "Participants with voting rights. Membership is granted by Assessors following a public application. Ideas Participants can vote on proposals, nominate themselves for Ideas Steward elections, veto role changes, and apply for Primary Layer membership." },
+              { name: "Assessors", text: "Appointed by Ideas Stewards to manage community standards and the membership process. They review applications, assign and revoke Ideas Participant roles, and can veto proposals to create a new Convergence Layer. They can also forward Primary Layer membership requests on behalf of Ideas Participants." },
+              { name: "Ideas Stewards", text: "Elected from among Ideas Participants every 3 months — up to 3 at a time, for a maximum of 2 terms each. They lead the Idea Layer operationally: updating metadata, assigning Assessors, requesting new Convergence Layers, and executing mandate changes. No Ideas Steward exists at the point of creation — the first must be elected after launch." },
             ].map((r, i, arr) => (
               <div
                 key={r.name}
@@ -137,7 +131,7 @@ const IdeasDao = () => {
             {[
               { step: "Step 1", title: "Find a topic", body: "Browse the forum at enterhere.io and find an Idea Layer whose discussions interest you." },
               { step: "Step 2", title: "Apply", body: "Submit a public membership application. Any participant can apply — no tokens required to get started." },
-              { step: "Step 3", title: "Get approved", body: "A Moderator reviews your application and assigns you the Member role if approved." },
+              { step: "Step 3", title: "Get approved", body: "An Assessor reviews your application and assigns you the Ideas Participant role if approved." },
             ].map((s) => (
               <div key={s.step} className="border border-foreground/15 p-4">
                 <p className="text-xs opacity-60 mb-1">{s.step}</p>
@@ -152,7 +146,7 @@ const IdeasDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Tokens you can earn</h2>
           <div className="border border-foreground/15">
             {[
-              { pill: "Election Token", text: "Awarded by Moderators to recognise active contributions. These cannot be exchanged for funds, but they carry real weight — they can be used to stand for Convener elections and to support an application for Primary Layer membership." },
+              { pill: "Election Token", text: "Awarded by Assessors to recognise active contributions. These cannot be exchanged for funds, but they carry real weight — they can be used to stand for Ideas Steward elections and to support an application for Primary Layer membership." },
               { pill: "Achievement Badge", text: "Issued when you are successfully elected into a role. It signals your accomplishment and also enforces term limits — ensuring no single participant can be elected to the same role more than twice." },
             ].map((t, i, arr) => (
               <div
@@ -170,12 +164,12 @@ const IdeasDao = () => {
           <h2 className="text-xs tracking-widest opacity-50 uppercase">Checks and balances</h2>
           <div className="space-y-2">
             <div className="border border-foreground/15 p-4">
-              <h3 className="text-sm mb-1">Members can veto governance changes</h3>
-              <p className="text-sm leading-relaxed opacity-70">When Conveners propose adopting new mandates, Members have the right to veto — requiring a high threshold and quorum. This ensures the community retains meaningful control over how the Idea Layer governs itself.</p>
+              <h3 className="text-sm mb-1">Ideas Participants can veto governance changes</h3>
+              <p className="text-sm leading-relaxed opacity-70">When Ideas Stewards propose adopting new mandates, Ideas Participants have the right to veto — requiring a high threshold and quorum. This ensures the community retains meaningful control over how the Idea Layer governs itself.</p>
             </div>
             <div className="border border-foreground/15 p-4">
               <h3 className="text-sm mb-1">A Vote of No Confidence can reset leadership</h3>
-              <p className="text-sm leading-relaxed opacity-70">If Members collectively lose confidence in the elected Conveners, they can trigger a Vote of No Confidence to immediately revoke all Convener roles and launch a fresh election.</p>
+              <p className="text-sm leading-relaxed opacity-70">If Ideas Participants collectively lose confidence in the elected Ideas Stewards, they can trigger a Vote of No Confidence to immediately revoke all Ideas Steward roles and launch a fresh election.</p>
             </div>
           </div>
         </section>
