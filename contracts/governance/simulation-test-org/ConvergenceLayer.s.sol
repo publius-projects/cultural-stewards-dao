@@ -6,35 +6,60 @@ import { DeploySetup } from "./DeploySetup.s.sol";
 import { PowersTypes } from "@lib/powers-monorepo/solidity/src/interfaces/PowersTypes.sol";
 import { Powers } from "@lib/powers-monorepo/solidity/src/Powers.sol";
 import { IPowers } from "@lib/powers-monorepo/solidity/src/interfaces/IPowers.sol";
-import { Governed721 } from "@lib/powers-monorepo/solidity/src/addons/helpers/Governed721.sol";
-import { Nominees } from "@lib/powers-monorepo/solidity/src/core/helpers/Nominees.sol"; 
-import { PowersFactory } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersFactory.sol"; 
+import { Nominees } from "@lib/powers-monorepo/solidity/src/core/helpers/Nominees.sol";
+import { PowersFactory } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersFactory.sol";
 import { PowersDeployer } from "@lib/powers-monorepo/solidity/src/core/helpers/PowersDeployer.sol";
 
+/// @notice Convergence Layer (PowersFactory template) — Simulation Test Org.
+/// Derived from the Cultural Stewardship DAO's ConvergenceLayer.s.sol. Changes (see Spec.md):
+///  - "Sell NFT artwork" (Governed721) removed outright — no replacement.
+///  - "Mint POAPs for Attendees" removed outright — its target mandate (Primary Layer's
+///    GovernedToken_MintEncodedToken) no longer exists.
+///  - "Request Membership" (GovernedToken_GatedAccess, token-gated) replaced with a 2-step
+///    "Claim Attendee Role" flow: StatementOfIntent (Public, throttled) -> BespokeAction_Advanced
+///    (Steward vote, assigns role 1 directly).
+///  - "Select Stewards" flow: ZKPassport_Check age-gate step removed with no replacement (the
+///    `Nominate` mandate's fixed `bool shouldNominate` input schema cannot carry a self-attested
+///    payload — accepted gap, see Spec.md Limitations). Resulting flow: Nominate (open) ->
+///    revoke-nomination (Legal Interfacer) -> PeerSelect (Legal Interfacer).
+///  - Setup `PresetActions_OnOwnPowers` calldata extended with one extra call —
+///    `assignRole(3, hannah)` — so every spawned Convergence Layer instance auto-assigns an
+///    initial Legal Interfacer at creation (the same demo Steward account already used for
+///    initial Primary Layer Stewards in DeploySetup.s.sol). This must be static/template-wide
+///    since the factory reuses one template for every instance — see Spec.md's "Demo Setup"
+///    section for why a per-instance dynamic assignment isn't feasible here.
+///  - `PauseMandates` target list rebuilt: the original referenced a stale, never-adopted
+///    mandate name ("Vote on 'Merit' NFT proposals") that never actually resolved to anything
+///    (a silent no-op bug). Replaced with two mandates that genuinely exist in this layer:
+///    payment-of-receipts and allowance-request.
+///  - `zkPassport_PowersRegistry`/`activityToken`/`governed721`/`mintPoapTokenId` parameters
+///    removed entirely from `constitutePowers`/`_createConstitution`.
+///  - Every votingPeriod/timelock/throttleExecution/quorum/succeedAt retimed per the Demo Timing
+///    Policy. "Assign Legal Interfacer" (called externally by the Ideas Layer) is kept
+///    structurally unchanged, only its input params are adapted to the new forwarding shape.
 contract ConvergenceLayer is DeploySetup {
     PowersTypes.Conditions conditions;
     PowersTypes.Flow[] flows;
 
-    PowersTypes.MandateInitData[] constitution; 
+    PowersTypes.MandateInitData[] constitution;
     PowersFactory powersFactory;
 
     //////////////////////////////////////////////////////////////////////
     //                        INITIALISATION                            //
     //////////////////////////////////////////////////////////////////////
-    function run() external { 
-        // Deploy factories first (empty) so their addresses are available
+    function run() external {
         console2.log("Deploying Convergence Layer factory (contract only)...");
         vm.startBroadcast();
-        PowersDeployer ConvergenceLayerDeployer = new PowersDeployer();  // £todo: I think this can be deployed as a singleton contract
-        powersFactory = new PowersFactory( 
-            string.concat(baseURI, "convergenceLayer.json"), // uri
-            helperConfig.getMaxCallDataLength(block.chainid), // max call data length
-            helperConfig.getMaxReturnDataLength(block.chainid), // max return data length
-            helperConfig.getMaxExecutionsLength(block.chainid), // max executions length 
+        PowersDeployer ConvergenceLayerDeployer = new PowersDeployer();
+        powersFactory = new PowersFactory(
+            string.concat(baseURI, "convergenceLayer.json"),
+            helperConfig.getMaxCallDataLength(block.chainid),
+            helperConfig.getMaxReturnDataLength(block.chainid),
+            helperConfig.getMaxExecutionsLength(block.chainid),
             address(ConvergenceLayerDeployer),
             address(registry)
         );
-        vm.stopBroadcast(); 
+        vm.stopBroadcast();
         console2.log("Convergence Layer factory deployed at:", address(powersFactory));
     }
 
@@ -43,17 +68,14 @@ contract ConvergenceLayer is DeploySetup {
     //////////////////////////////////////////////////////////////////////
     function constitutePowers(
         address primaryLayer,
-        address governed721,
-        address zkPassport_PowersRegistry,
-        address activityToken,
         address nominees,
-        uint16 mintPoapTokenId,
         uint16 requestAllowanceConvergenceLayerId
     ) public {
-        _createConstitution(primaryLayer, governed721, zkPassport_PowersRegistry, activityToken, nominees, mintPoapTokenId, requestAllowanceConvergenceLayerId);
-        
-        // NB: packageInitData no longer exists in the current powers-monorepo checkout;
-        // PowersFactory.addMandates takes the full array directly.
+        _createConstitution(primaryLayer, nominees, requestAllowanceConvergenceLayerId);
+
+        // NB: `packageInitData` (used by the original Cultural Stewardship DAO's equivalent
+        // file) no longer exists in the current powers-monorepo checkout — PowersFactory.addMandates
+        // takes the full array directly, so we just copy the storage array to memory here.
         PowersTypes.MandateInitData[] memory constitutionPacked = new PowersTypes.MandateInitData[](constitution.length);
         for (uint256 i = 0; i < constitution.length; i++) {
             constitutionPacked[i] = constitution[i];
@@ -73,11 +95,10 @@ contract ConvergenceLayer is DeploySetup {
     }
 
     function _initMandateAddresses() internal {
-        m_Adopt_Mandates = registry.getMandateAddress(MAJOR, MINOR, PATCH, "Adopt_Mandates");
+        m_Adopt_Mandates = _latestMandateAddress("Adopt_Mandates");
         m_BespokeAction_Advanced = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Advanced");
         m_BespokeAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Simple");
         m_ExternalAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "ExternalAction_Simple");
-        m_GovernedToken_GatedAccess = registry.getMandateAddress(MAJOR, MINOR, PATCH, "GovernedToken_GatedAccess");
         m_Nominate = registry.getMandateAddress(MAJOR, MINOR, PATCH, "Nominate");
         m_PauseMandates = registry.getMandateAddress(MAJOR, MINOR, PATCH, "PauseMandates");
         m_PeerSelect = registry.getMandateAddress(MAJOR, MINOR, PATCH, "PeerSelect");
@@ -85,7 +106,6 @@ contract ConvergenceLayer is DeploySetup {
         m_SafeAllowance_Transfer = registry.getMandateAddress(MAJOR, MINOR, PATCH, "SafeAllowance_Transfer");
         m_Safe_RecoverTokens = registry.getMandateAddress(MAJOR, MINOR, PATCH, "Safe_RecoverTokens");
         m_StatementOfIntent = registry.getMandateAddress(MAJOR, MINOR, PATCH, "StatementOfIntent");
-        m_ZKPassport_Check = registry.getMandateAddress(MAJOR, MINOR, PATCH, "ZKPassport_Check");
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -93,38 +113,38 @@ contract ConvergenceLayer is DeploySetup {
     //////////////////////////////////////////////////////////////////////
     function _createConstitution(
         address primaryLayer,
-        address governed721,
-        address zkPassport_PowersRegistry,
-        address activityToken,
         address nominees,
-        uint16 mintPoapTokenId, 
         uint16 requestAllowanceConvergenceLayerId
     ) internal {
         blocksPerHour = helperConfig.getBlocksPerHour(block.chainid);
-        mandateCount = 3; // resetting mandate count.
+        mandateCount = 3; // resetting mandate count (matches original factory-template offset).
         if (m_StatementOfIntent == address(0)) _initMandateAddresses();
         //////////////////////////////////////////////////////////////////////
         //                              SETUP                               //
         //////////////////////////////////////////////////////////////////////
 
-        // setup role labels // 
-        calldatas = new bytes[](12);
+        // setup role labels //
+        calldatas = new bytes[](13);
         calldatas[0] = abi.encodeWithSelector(IPowers.labelRole.selector, 0, "Ideas Layer", "");
-        calldatas[1] = abi.encodeWithSelector(IPowers.labelRole.selector, type(uint256).max, "Public", ""); 
-        calldatas[2] = abi.encodeWithSelector(IPowers.labelRole.selector, 1, "Attendee", ""); 
-        calldatas[3] = abi.encodeWithSelector(IPowers.labelRole.selector, 2, "Steward", ""); 
+        calldatas[1] = abi.encodeWithSelector(IPowers.labelRole.selector, type(uint256).max, "Public", "");
+        calldatas[2] = abi.encodeWithSelector(IPowers.labelRole.selector, 1, "Attendee", "");
+        calldatas[3] = abi.encodeWithSelector(IPowers.labelRole.selector, 2, "Steward", "");
         calldatas[4] = abi.encodeWithSelector(IPowers.labelRole.selector, 3, "Legal Interfacer", "");
         calldatas[5] = abi.encodeWithSelector(IPowers.labelRole.selector, 6, "Primary Layer", "");
         calldatas[6] = abi.encodeWithSelector(IPowers.assignRole.selector, 0, cedars);
         calldatas[7] = abi.encodeWithSelector(IPowers.assignRole.selector, 1, testAccount1);
         calldatas[8] = abi.encodeWithSelector(IPowers.assignRole.selector, 2, testAccount1);
         calldatas[9] = abi.encodeWithSelector(IPowers.assignRole.selector, 3, testAccount1);
-        calldatas[10] = abi.encodeWithSelector(IPowers.assignRole.selector, 6, primaryLayer); 
-        // £todo: treasury as itself. 
-        calldatas[11] = abi.encodeWithSelector(IPowers.revokeMandate.selector, mandateCount + 1); // revoke mandate 1 after use. 
+        calldatas[10] = abi.encodeWithSelector(IPowers.assignRole.selector, 6, primaryLayer);
+        // Demo Setup: auto-assign the designated demo Steward account (hannah — see
+        // DeploySetup.s.sol) as this Convergence Layer's initial Legal Interfacer, so "Request
+        // funds" works immediately after creation with no live nomination step. See Spec.md's
+        // "Demo Setup — Pre-Seeded State" section for why this must be static per-template.
+        calldatas[11] = abi.encodeWithSelector(IPowers.assignRole.selector, 3, hannah);
+        calldatas[12] = abi.encodeWithSelector(IPowers.revokeMandate.selector, mandateCount + 1); // revoke mandate 1 after use.
 
         mandateCount++;
-        conditions.allowedRole = type(uint256).max; // = public.
+        conditions.allowedRole = type(uint256).max;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Initial Setup: Assign role labels and revokes itself after execution",
@@ -138,45 +158,11 @@ contract ConvergenceLayer is DeploySetup {
         //////////////////////////////////////////////////////////////////////
         //                      EXECUTIVE MANDATES                          //
         //////////////////////////////////////////////////////////////////////
-        // £NB: Minting and setting the URI no all managed externally from this Layer. 
-        // The artist has to assign the layer as approved to transfer artworks. 
-  
-        // StewardS FORCE SELL NFT ART WORK //
-        uint16[] memory mandateIds = new uint16[](1);
-        mandateIds[0] = mandateCount + 1;
+        // NB: "Sell NFT artwork" (Governed721) removed outright — no art-sale mechanism in this
+        // org (see Spec.md Limitations).
 
-        flows.push(PowersTypes.Flow({
-            nameDescription: "Sell NFT artwork: This flow allows Stewards to sell NFT art works, automatically transferring the NFT and distributing payments.",
-            mandateIds: mandateIds
-        }));
-
-        // NOTE: Owners of art works can always decide to sell art work on their own account. Income of sell will be distributed in both cases. 
-        inputParams = new string[](4); 
-        inputParams[0] = "address oldOwner";
-        inputParams[1] = "address newOwner";
-        inputParams[2] = "uint256 TokenId";
-        inputParams[3] = "bytes Data"; // encoded PaymentToken + quantity + nonce. 
-        // Note that technically the Convergence Layer can pay for sale if the buyer paid the Layer directly. It would result in the layer owning the NFT, while buyer has the convergence artwork. 
-
-        // NB: this will only work if the convergence layer has been approved by the artist to transfer the art work NFTs. This is to ensure that artists have control over which art works can be sold through the layer.
-        mandateCount++;
-        conditions.allowedRole = 2; // Stewards. 
-        constitution.push(
-            PowersTypes.MandateInitData({
-                nameDescription: "Sell NFT artwork: Stewards can sell NFT art works, which will automatically transfer from the owner of the NFT to the buyer and distribute payments according to splits set by the governed721DAO.",
-                targetMandate: m_BespokeAction_Simple,
-                config: abi.encode(
-                    governed721,
-                    Governed721.safeTransferFrom.selector,
-                    inputParams
-                ),
-                conditions: conditions
-            })
-        ); 
-        delete conditions;
-
-        // REQUEST ALLOWANCES FROM PRIME DAO //
-        mandateIds = new uint16[](2);
+        // REQUEST ALLOWANCES FROM PRIMARY LAYER //
+        uint16[] memory mandateIds = new uint16[](2);
         mandateIds[0] = mandateCount + 1;
         mandateIds[1] = mandateCount + 2;
 
@@ -191,13 +177,13 @@ contract ConvergenceLayer is DeploySetup {
         inputParams[2] = "uint96 allowanceAmount";
         inputParams[3] = "uint16 resetTimeMin";
         inputParams[4] = "uint32 resetBaseMin";
- 
+
         // Stewards: Veto request allowance from Primary Layer
         mandateCount++;
-        conditions.allowedRole = 2; // Steward 
+        conditions.allowedRole = 2;
         constitution.push(
             PowersTypes.MandateInitData({
-                nameDescription: "Veto request allowance: Stewards can veto a request for additional allowance", //
+                nameDescription: "Veto request allowance: Stewards can veto a request for additional allowance",
                 targetMandate: m_StatementOfIntent,
                 config: abi.encode(inputParams),
                 conditions: conditions
@@ -207,20 +193,20 @@ contract ConvergenceLayer is DeploySetup {
 
         // Legal Interfacer: Request allowance from Primary Layer
         mandateCount++;
-        conditions.allowedRole = 3; // Legal Interfacer 
+        conditions.allowedRole = 3;
         conditions.needNotFulfilled = mandateCount - 1;
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour);
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
         conditions.succeedAt = 66;
-        conditions.quorum = 80;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
-                nameDescription: "Request allowance: Repository admins can request an allowance from the Primary Layer Safe Treasury.",
+                nameDescription: "Request allowance: Legal Interfacer can request an allowance from the Primary Layer Safe Treasury.",
                 targetMandate: m_ExternalAction_Simple,
                 config: abi.encode(
-                    address(primaryLayer), // target contract
-                    requestAllowanceConvergenceLayerId, // parent mandate id (the request allowance at primary Layer mandate)
+                    address(primaryLayer),
+                    requestAllowanceConvergenceLayerId,
                     "Requesting allowance from Primary Layer Safe Treasury",
-                    inputParams // dynamic params (the input params of the parent mandate)
+                    inputParams
                 ),
                 conditions: conditions
             })
@@ -243,10 +229,10 @@ contract ConvergenceLayer is DeploySetup {
 
         // Stewards: Submit & approve Payment of Receipt
         mandateCount++;
-        conditions.allowedRole = 2; // Stewards can propose and vote on receipts.   
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour);
-        conditions.succeedAt = 67;
-        conditions.quorum = 50; 
+        conditions.allowedRole = 2;
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
+        conditions.succeedAt = 66;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Submit & Approve payment of receipt: Execute a transaction from the Safe Treasury.",
@@ -258,98 +244,96 @@ contract ConvergenceLayer is DeploySetup {
         delete conditions;
 
         // ASSIGN LEGAL INTERFACER (from Ideas Layer) //
-        // Called by the parent Ideas Layer (role 0) via ExternalAction_OnReturnValue after ZKP verification.
-        // Receives abi.encode(uint256(3), candidateAddress) as mandateCalldata and assigns role 3 on this CL.
+        // Called by the parent Ideas Layer (role 0) via ExternalAction_Flexible after the
+        // Primary Layer veto window expires. Receives (address Candidate, bool AttestsAge18Plus,
+        // bool AttestsGBREligible) as forwarded calldata and assigns role 3 (Legal Interfacer) on
+        // this CL — role id is fixed in `paramsBefore`, only Candidate is functionally used.
         // NB: role 0 must be assigned to the parent Ideas Layer instance at CL instantiation time.
         mandateIds = new uint16[](1);
         mandateIds[0] = mandateCount + 1;
 
         flows.push(PowersTypes.Flow({
-            nameDescription: "Assign Legal Interfacer: The parent Ideas Layer assigns the Legal Interfacer role (role 3) after ZKP verification on the Ideas Layer. Called automatically via ExternalAction_OnReturnValue.",
+            nameDescription: "Assign Legal Interfacer: The parent Ideas Layer assigns the Legal Interfacer role (role 3) after its own propose/veto flow completes. Called externally via ExternalAction_Flexible. Used to REPLACE the Legal Interfacer after the initial auto-assignment at creation.",
             mandateIds: mandateIds
         }));
 
-        inputParams = new string[](2);
-        inputParams[0] = "uint256 RoleId";
-        inputParams[1] = "address Candidate";
+        {
+            string[] memory assignLegalInterfacerParams = new string[](3);
+            assignLegalInterfacerParams[0] = "address Candidate";
+            assignLegalInterfacerParams[1] = "bool AttestsAge18Plus";
+            assignLegalInterfacerParams[2] = "bool AttestsGBREligible";
 
-        mandateCount++;
-        conditions.allowedRole = 0; // = Ideas Layer (role 0 must be assigned to the parent IL instance at CL setup)
-        constitution.push(
-            PowersTypes.MandateInitData({
-                nameDescription: "Assign Legal Interfacer: The parent Ideas Layer can assign the Legal Interfacer role (role 3) to a ZKP-verified candidate. Called via ExternalAction_OnReturnValue after the Ideas Layer ZKP checks pass and the Primary Layer veto window expires.",
-                targetMandate: m_BespokeAction_Advanced,
-                config: abi.encode(
-                    address(0), // target: own Powers contract
-                    IPowers.assignRole.selector,
-                    abi.encode(), // no paramsBefore — roleId and candidate address come from mandateCalldata
-                    inputParams, // ["uint256 RoleId", "address Candidate"] — decoded from incoming calldata
-                    abi.encode() // no paramsAfter
-                ),
-                conditions: conditions
-            })
-        );
-        delete conditions;
-
-        // MINT POAPS FOR ATTENDEES //
-        mandateIds = new uint16[](1);
-        mandateIds[0] = mandateCount + 1;
-
-        flows.push(PowersTypes.Flow({
-            nameDescription: "Mint POAPs for Attendees: This flow allows Stewards to mint POAPs for event attendees.",
-            mandateIds: mandateIds
-        }));
-
-        inputParams = new string[](1);
-        inputParams[0] = "address To";
-
-        // Stewards: Mint POAPs for attendees
-        // Note: for now this is managed through a bespoke Soulbound1155 contract. 
-        // Before a convergence event is organised, this should be implemented through either POAP.xyz, or IYK protocols.    
-        mandateCount++;
-        conditions.allowedRole = 1; // = Stewards
-        constitution.push(
-            PowersTypes.MandateInitData({
-                nameDescription: "Mint POAP: Any Steward can mint a POAP.",
-                targetMandate: m_ExternalAction_Simple,
-                config: abi.encode(
-                    address(primaryLayer),
-                    uint16(mintPoapTokenId), // parent mandate id (the mint POAP token at Primary Layer mandate)
-                    "Requesting minting of POAP from Primary Layer",
-                    inputParams
-                ),
-                conditions: conditions
-            })
-        );
+            mandateCount++;
+            conditions.allowedRole = 0; // = Ideas Layer (role 0 must be assigned to the parent IL instance at CL setup)
+            constitution.push(
+                PowersTypes.MandateInitData({
+                    nameDescription: "Assign Legal Interfacer: The parent Ideas Layer can assign the Legal Interfacer role (role 3) to a candidate after its own propose/veto flow completes.",
+                    targetMandate: m_BespokeAction_Advanced,
+                    config: abi.encode(
+                        address(0), // target: own Powers contract
+                        IPowers.assignRole.selector,
+                        abi.encode(uint256(3)), // paramsBefore — role id 3 = Legal Interfacer, fixed
+                        assignLegalInterfacerParams, // Candidate + attestation booleans (booleans unused, decoded and ignored)
+                        abi.encode() // no paramsAfter
+                    ),
+                    conditions: conditions
+                })
+            );
+        }
         delete conditions;
 
         //////////////////////////////////////////////////////////////////////
         //                      ELECTORAL MANDATES                          //
         //////////////////////////////////////////////////////////////////////
+        // NB: "Mint POAPs for Attendees" removed outright — no activity token exists in this org.
 
-        // CLAIM ATTENDEE ROLE //   
-        mandateIds = new uint16[](1);
+        // CLAIM ATTENDEE ROLE //
+        // Replaces the original's token-gated "Request Membership" (GovernedToken_GatedAccess)
+        // with a governance-approved application, mirroring the Primary Layer's "Claim
+        // Participant Role" flow and the Ideas Layer's own Participant-application pattern.
+        mandateIds = new uint16[](2);
         mandateIds[0] = mandateCount + 1;
+        mandateIds[1] = mandateCount + 2;
 
         flows.push(PowersTypes.Flow({
-            nameDescription: "Claim Attendee Role: This flow allows anyone to become a member if they have sufficient POAPs.",
+            nameDescription: "Claim Attendee Role: This flow allows anyone to apply for the Attendee role; a Steward vote assigns it directly (no token check - see Spec.md).",
             mandateIds: mandateIds
         }));
 
-        // I think this will work. Still needs to be tested though. 
-        // IT DOES NOT
+        inputParams = new string[](1);
+        inputParams[0] = "address Applicant";
+
+        // Public: apply for Attendee role (throttled).
         mandateCount++;
-        conditions.allowedRole = type(uint256).max; // = public
+        conditions.allowedRole = type(uint256).max;
+        conditions.throttleExecution = minutesToBlocks(1, blocksPerHour);
         constitution.push(
             PowersTypes.MandateInitData({
-                nameDescription: "Request Membership: Anyone can become a member if they have sufficient POAPs minted through the primary Layer during the last 15 days.",
-                targetMandate: m_GovernedToken_GatedAccess,
+                nameDescription: "Apply for Attendee role: Anyone can apply for the Attendee role of this Convergence Layer by submitting an application.",
+                targetMandate: m_StatementOfIntent,
+                config: abi.encode(inputParams),
+                conditions: conditions
+            })
+        );
+        delete conditions;
+
+        // Stewards: assess and assign Attendee role.
+        mandateCount++;
+        conditions.allowedRole = 2;
+        conditions.needFulfilled = mandateCount - 1;
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
+        conditions.succeedAt = 51;
+        conditions.quorum = 20;
+        constitution.push(
+            PowersTypes.MandateInitData({
+                nameDescription: "Assess and Assign Attendee: Stewards can assess applications and assign the Attendee role to applicants.",
+                targetMandate: m_BespokeAction_Advanced,
                 config: abi.encode(
-                    activityToken, // soulbound token contract
-                    1, // attendee role Id
-                    0, // checks if token is from address that holds role Id 0 (meaning the admin, which is the Layer itself).
-                    uint48(daysToBlocks(15, blocksPerHour)), // look back period in blocks = 15 days.
-                    uint48(1) // number of tokens required. Only one POAP needed for membership.
+                    address(0),
+                    IPowers.assignRole.selector,
+                    abi.encode(1), // role id 1 = Attendee
+                    inputParams,
+                    abi.encode()
                 ),
                 conditions: conditions
             })
@@ -357,91 +341,68 @@ contract ConvergenceLayer is DeploySetup {
         delete conditions;
 
         // SELECT Stewards //
-        mandateIds = new uint16[](4);
+        // ZKPassport_Check age-gate step removed — the Nominate mandate's fixed
+        // `bool shouldNominate` input schema has no room for a self-attestation payload, so this
+        // instance of ZKPassport removal has no direct replacement (see Spec.md Limitations).
+        mandateIds = new uint16[](3);
         mandateIds[0] = mandateCount + 1;
         mandateIds[1] = mandateCount + 2;
         mandateIds[2] = mandateCount + 3;
-        mandateIds[3] = mandateCount + 4; 
 
         flows.push(PowersTypes.Flow({
-            nameDescription: "Select Stewards: This flow allows for the nomination, selection, and peer election of Stewards.",
+            nameDescription: "Select Stewards: This flow allows for the nomination and peer election of Stewards. Nomination is open to anyone (no eligibility gate - see Spec.md Limitations).",
             mandateIds: mandateIds
         }));
 
-        inputParams = new string[](1);
-        inputParams[0] = "bool Nominate"; 
-
-        // anybody: do ZKP check: age >= 18 
-        mandateCount++;
-        conditions.allowedRole = type(uint256).max; // = public. anyone can pass the ZKP check to propose a legal Interfacer for the Convergence Layer.
-        constitution.push(
-            PowersTypes.MandateInitData({
-                nameDescription: "ZK-Passport Check Age: Anyone over the age of 18 can propose to be a Steward for the Convergence Layer",
-                targetMandate: m_ZKPassport_Check,
-                config: abi.encode(
-                    inputParams,
-                    zkPassport_PowersRegistry, 
-                    60 * 60 * 24 * 90, // the time window in which the ZKP proof needs to have been created. This is three months.
-                    false, // facematch not required (for now) 
-                    bytes4(keccak256("isAgeAboveOrEqual(uint8)")),  
-                    abi.encode(uint8(18)) // the input for the zkp check (age > 18) 
-                    ),
-                conditions: conditions
-            })
-        );
-        delete conditions;
-
         // Anyone: Nominate for selection to be Steward.
         mandateCount++;
-        conditions.allowedRole = type(uint256).max; // = public
-        conditions.needFulfilled = mandateCount - 1; // need the previous ZKP check mandate to be fulfilled to nominate for Steward selection.
+        conditions.allowedRole = type(uint256).max;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Nominate for selection: any member can nominate to be selected for Steward role.",
                 targetMandate: m_Nominate,
-                config: abi.encode(
-                    nominees // election list contract
-                ),
+                config: abi.encode(nominees),
                 conditions: conditions
             })
         );
         delete conditions;
 
-        // legal reps: force revoke nomination.
-        mandateCount++;
+        // Legal Interfacers: force revoke nomination.
         inputParams = new string[](1);
-        inputParams[0] = "address Nominee"; // the address of the nominee whose nomination is to be revoked.
+        inputParams[0] = "address Nominee";
 
-        conditions.allowedRole = 3; // = legal Interfacers.
+        mandateCount++;
+        conditions.allowedRole = 3;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Revoke nomination for election: Legal Interfacers can revoke nominations for Steward elections.",
                 targetMandate: m_BespokeAction_Advanced,
                 config: abi.encode(
-                    nominees, // election list contract
+                    nominees,
                     Nominees.revokeNomination.selector,
-                    abi.encode(), // params before
+                    abi.encode(),
                     inputParams,
-                    abi.encode(false) // params after
+                    abi.encode(false)
                 ),
                 conditions: conditions
             })
         );
         delete conditions;
 
-        // Legal Interfacers: adopt peer select mandate to select Stewards from the pool of nominees. 
+        // Legal Interfacers: adopt peer select mandate to select Stewards from the pool of nominees.
         mandateCount++;
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour); // = 5 minutes / days
-        conditions.succeedAt = 51; // = simple majority
-        conditions.quorum = 80; // = 80% quorum
-        conditions.allowedRole = 3; // = legal Interfacers. Legal Interfacers can select Stewards from the pool of nominees through a peer selection process.
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
+        conditions.succeedAt = 66;
+        conditions.quorum = 30;
+        conditions.maxExecutionDelay = minutesToBlocks(2, blocksPerHour); // stale-state rule: PeerSelect reads live nominee state.
+        conditions.allowedRole = 3;
         constitution.push(PowersTypes.MandateInitData({
                 nameDescription: "Select Stewards: Legal Interfacers can select Stewards from the pool of nominees.",
                 targetMandate: m_PeerSelect,
                 config: abi.encode(
-                    uint8(3), // numberToSelect
-                    uint256(2), // RoleId for Stewards
-                    nominees // election list contract // 
+                    uint8(3),
+                    uint256(2),
+                    nominees
                 ),
                 conditions: conditions
             }));
@@ -468,10 +429,10 @@ contract ConvergenceLayer is DeploySetup {
 
         // Members: initiate Adopting Mandates
         mandateCount++;
-        conditions.allowedRole = 1; // Members
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour);
+        conditions.allowedRole = 1;
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
         conditions.succeedAt = 66;
-        conditions.quorum = 77;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Initiate Adopting Mandates: Members can initiate adopting new mandates",
@@ -484,11 +445,11 @@ contract ConvergenceLayer is DeploySetup {
 
         // primaryLayer: Veto Adopting Mandates
         mandateCount++;
-        conditions.allowedRole = 6; // primaryLayer = role 6. 
+        conditions.allowedRole = 6;
         conditions.needFulfilled = mandateCount - 1;
         constitution.push(
             PowersTypes.MandateInitData({
-                nameDescription: "Veto Adopting Mandates: primaryLayer can veto proposals to adopt new mandates", 
+                nameDescription: "Veto Adopting Mandates: primaryLayer can veto proposals to adopt new mandates",
                 targetMandate: m_StatementOfIntent,
                 config: abi.encode(adoptMandatesParams),
                 conditions: conditions
@@ -498,12 +459,12 @@ contract ConvergenceLayer is DeploySetup {
 
         // Stewards: Adopt Mandates
         mandateCount++;
-        conditions.allowedRole = 2; // Stewards
+        conditions.allowedRole = 2;
         conditions.needFulfilled = mandateCount - 2;
         conditions.needNotFulfilled = mandateCount - 1;
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour);
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
         conditions.succeedAt = 66;
-        conditions.quorum = 80;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Adopt new Mandates: Stewards can adopt new mandates into the organization",
@@ -516,23 +477,23 @@ contract ConvergenceLayer is DeploySetup {
 
         // LEGAL REPS CAN PAUSE AND RESTART MANDATES //
         mandateIds = new uint16[](1);
-        mandateIds[0] = mandateCount + 1; 
+        mandateIds[0] = mandateCount + 1;
 
         flows.push(PowersTypes.Flow({
             nameDescription: "Pause Mandates: This flow allows Legal Interfacers to adopt or revoke executive mandates, effectively controlling the Layer's functional state.",
             mandateIds: mandateIds
         }));
 
-        // (Effectively giving power to pause functioning of the layer). 
-        // Mandates to be adopted / revoked: (£todo: for now this is a placeholder, need to decide which Mandates to place here!).  
-        string[] memory mandatesToPause = new string[](5);
-        mandatesToPause[0] = "Sell NFT artwork";
-        mandatesToPause[1] = "Submit & approve payment of receipt";
-        mandatesToPause[2] = "Mint POAP: Any Steward can mint a POAP";
-        mandatesToPause[3] = "Vote on 'Merit' NFT proposals";
-        mandatesToPause[4] = "Update URI";
+        // Pause targets rebuilt to reference mandates that genuinely exist in this simplified
+        // layer — the original's target list included a stale reference to a mandate that was
+        // never actually adopted ("Vote on 'Merit' NFT proposals"), which silently resolved to
+        // an empty index set. These two strings must match the nameDescriptions pushed above
+        // exactly (findIndices does an exact string match).
+        string[] memory mandatesToPause = new string[](2);
+        mandatesToPause[0] = "Submit & Approve payment of receipt: Execute a transaction from the Safe Treasury.";
+        mandatesToPause[1] = "Request allowance: Legal Interfacer can request an allowance from the Primary Layer Safe Treasury.";
         (uint16[] memory indexFlows16, uint16[] memory indexMandates16) = findIndices(mandatesToPause, constitution, flows);
-        
+
         uint8[] memory indexFlows = new uint8[](indexFlows16.length);
         uint8[] memory indexMandates = new uint8[](indexMandates16.length);
         for(uint256 i = 0; i < indexFlows16.length; i++) {
@@ -542,10 +503,10 @@ contract ConvergenceLayer is DeploySetup {
 
         // Legal Interfacers: Pause Mandates
         mandateCount++;
-        conditions.allowedRole = 3; // Legal Interfacers
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour);
+        conditions.allowedRole = 3;
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
         conditions.succeedAt = 66;
-        conditions.quorum = 80;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Pause Mandates: Legal Interfacers can pause mandates in the organization",
@@ -562,21 +523,21 @@ contract ConvergenceLayer is DeploySetup {
         // MISCELLANEOUS //
         // UPDATE URI //
         inputParams = new string[](1);
-        inputParams[0] = "string newUri"; 
+        inputParams[0] = "string newUri";
 
         // Stewards: Update URI
         mandateCount++;
-        conditions.allowedRole = 2; // = Stewards
-        conditions.votingPeriod = minutesToBlocks(5, blocksPerHour); // = 5 minutes / days
-        conditions.succeedAt = 66; // = 2/3 majority
-        conditions.quorum = 66; // = 66% quorum
+        conditions.allowedRole = 2;
+        conditions.votingPeriod = minutesToBlocks(2, blocksPerHour);
+        conditions.succeedAt = 66;
+        conditions.quorum = 30;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Update URI: Set allowed token for Convergence Layer",
                 targetMandate: m_BespokeAction_Simple,
                 config: abi.encode(
-                    address(0), // target address is its own powers contract
-                    Powers.setUri.selector, // function selector to call
+                    address(0),
+                    Powers.setUri.selector,
                     inputParams
                 ),
                 conditions: conditions
@@ -586,14 +547,14 @@ contract ConvergenceLayer is DeploySetup {
 
         // TRANSFER TOKENS INTO TREASURY //
         mandateCount++;
-        conditions.allowedRole = 2; // = Stewards. Any Steward can call this mandate.
+        conditions.allowedRole = 2;
         constitution.push(
             PowersTypes.MandateInitData({
                 nameDescription: "Transfer tokens to treasury: Any tokens accidently sent to the Layer can be recovered by sending them to the treasury",
-                targetMandate: m_Safe_RecoverTokens, // maybe functionality has to change slightly: have token to be transferred as input param. 
+                targetMandate: m_Safe_RecoverTokens,
                 config: abi.encode(
-                    treasury, 
-                    helperConfig.getSafeAllowanceModule(block.chainid) // allowance module address
+                    treasury,
+                    helperConfig.getSafeAllowanceModule(block.chainid)
                 ),
                 conditions: conditions
             })

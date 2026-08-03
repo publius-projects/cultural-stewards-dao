@@ -8,7 +8,10 @@ import { PowersTypes } from "@lib/powers-monorepo/solidity/src/interfaces/Powers
 import { Initialise } from "./Initialise.s.sol";
 
 /// @title InitialiseRunner
-/// @notice Stateful checkpoint runner for the Cultural Stewards DAO initialisation flow.
+/// @notice Stateful checkpoint runner for the Simulation Test Org initialisation flow. Adapted
+/// from the Cultural Stewardship DAO's governance/actions/InitialiseRunner.s.sol. Drives the
+/// Spec.md "Demo Setup" seeding of the two Ideas Layers named "Yin" and "Yang", plus (optionally)
+/// a demo Convergence Layer.
 ///
 /// Call run() repeatedly. Each invocation reads on-chain state to determine which
 /// phases are already complete, executes every phase whose preconditions are now
@@ -20,9 +23,8 @@ import { Initialise } from "./Initialise.s.sol";
 ///
 /// Usage on a live chain:
 ///   forge script InitialiseRunner --sig "run(...)" ...  // repeat after each window closes
-///
-/// All mandate IDs for a given organisation are resolved in a single cache scan at
-/// the start of run() and stored in a struct... no repeated string-lookup RPC calls.
+///   (Demo Timing Policy: 2-minute voting windows, 1-minute timelocks — a full pass through
+///   every phase takes only a few minutes of real waiting between invocations.)
 contract InitialiseRunner is Initialise {
 
     ///////////////////////////////////////////////////////////////////////////
@@ -55,7 +57,8 @@ contract InitialiseRunner is Initialise {
     /// @param primaryLayer   Address of the deployed Primary Layer.
     /// @param digitalLayer   Address of the deployed Digital Layer.
     /// @param nonce          Nonce used to derive deterministic action IDs.
-    /// @param ideasLayerNames Names of the Ideas Layers to deploy (e.g. ["Seeing", "Making"]).
+    /// @param ideasLayerNames Names of the Ideas Layers to deploy — pass ["Yin", "Yang"] to match
+    ///                        Spec.md's "Demo Setup — Pre-Seeded State".
     /// @param privateKeys    Keys with permission to execute each governance step.
     function run(
         address primaryLayer,
@@ -81,7 +84,7 @@ contract InitialiseRunner is Initialise {
 
         // ── Phase 1: Propose Ideas Layer initiation (one proposal per layer) ─────
         if (!_haveActionsBeenSubmitted(primaryLayer, p.initiateIdeasLayer, ideasCount)) {
-            console2.log("Runner [1]: proposing Ideas Layer initiation.");
+            console2.log("Runner [1]: proposing Ideas Layer initiation (Yin/Yang).");
             deployIdeasLayer1(primaryLayer, nonce, ideasLayerNames, privateKeys);
             console2.log("Runner: pausing. initiation voting window must close before phase 2.");
             return;
@@ -107,18 +110,34 @@ contract InitialiseRunner is Initialise {
                 _logBlocksRemaining(primaryLayer, p.createIdeasLayer, ideasCount);
                 return;
             }
-            console2.log("Runner [3]: deploying Ideas Layers.");
+            console2.log("Runner [3]: deploying Ideas Layers (Yin, Yang).");
             deployIdeasLayer3(primaryLayer, nonce, ideasLayerNames, privateKeys);
         }
 
-        // Ideas Layers are now deployed. Resolve mandate IDs for the first one.
+        console2.log("Runner: Yin/Yang Ideas Layer seeding complete!");
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    //                  OPTIONAL: DEMO CONVERGENCE LAYER
+    ///////////////////////////////////////////////////////////////////////////
+
+    /// @notice Advance the demo Convergence Layer creation flow (e.g. "Basel Art Exhibition"),
+    /// spawned from the first seeded Ideas Layer (index 0, expected to be "Yin"). Call this
+    /// separately, after run() above has completed and Yin holds role 4 at the Primary Layer.
+    function runConvergenceLayerDemo(
+        address primaryLayer,
+        string memory layerName,
+        uint256 nonce,
+        uint256[] memory privateKeys
+    ) public {
+        PrimaryLayerMandateIds memory p = _resolvePrimaryLayerMandateIds(primaryLayer);
         address ideasLayer0 = Powers(payable(primaryLayer)).getRoleHolderAtIndex(4, 0);
         IdeasLayerMandateIds memory il = _resolveIdeasLayerMandateIds(ideasLayer0);
 
         // ── Phase 4: Propose Convergence Layer request at Ideas Layer 0 ──────────
         if (!_haveActionsBeenSubmitted(ideasLayer0, il.requestNewConvergenceLayer, 1)) {
             console2.log("Runner [4]: proposing Convergence Layer request.");
-            deployConvergenceLayer1(ideasLayer0, nonce, privateKeys);
+            deployConvergenceLayer1(ideasLayer0, layerName, nonce, privateKeys);
             console2.log("Runner: pausing... convergence request voting window must close before phase 5.");
             return;
         }
@@ -131,7 +150,7 @@ contract InitialiseRunner is Initialise {
                 return;
             }
             console2.log("Runner [5]: executing convergence request + proposing send-request.");
-            deployConvergenceLayer2(ideasLayer0, nonce, privateKeys);
+            deployConvergenceLayer2(ideasLayer0, layerName, nonce, privateKeys);
             console2.log("Runner: pausing... send-request voting window must close before phase 6.");
             return;
         }
@@ -144,13 +163,13 @@ contract InitialiseRunner is Initialise {
                 return;
             }
             console2.log("Runner [6]: sending request... Convergence Layer being created.");
-            deployConvergenceLayer3(primaryLayer, ideasLayer0, nonce, privateKeys);
+            deployConvergenceLayer3(ideasLayer0, layerName, nonce, privateKeys);
         }
 
         // ── Phase 7: Propose role-assignment + delegate + paymaster ───────────────
         if (!_haveActionsBeenSubmitted(primaryLayer, p.assignRoleToConvergenceLayer, 1)) {
             console2.log("Runner [7]: proposing Convergence Layer role assignments.");
-            deployConvergenceLayer4(primaryLayer, nonce, privateKeys);
+            deployConvergenceLayer4(primaryLayer, layerName, nonce, privateKeys);
             console2.log("Runner: pausing... assignment voting/timelock must pass before phase 8.");
             return;
         }
@@ -164,10 +183,10 @@ contract InitialiseRunner is Initialise {
                 return;
             }
             console2.log("Runner [8]: finalising Convergence Layer.");
-            deployConvergenceLayer5(primaryLayer, nonce, privateKeys);
+            deployConvergenceLayer5(primaryLayer, layerName, nonce, privateKeys);
         }
 
-        console2.log("Runner: initialisation complete!");
+        console2.log("Runner: Convergence Layer demo setup complete!");
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -210,14 +229,11 @@ contract InitialiseRunner is Initialise {
     ///////////////////////////////////////////////////////////////////////////
 
     /// @dev True once the initial-setup mandate has run and role 1 has been labelled.
-    ///      The setup mandate labels roles then revokes itself, making this a reliable
-    ///      one-time signal.
     function _isSetupComplete(address org) internal view returns (bool) {
         return bytes(Powers(payable(org)).getRoleLabel(1)).length > 0;
     }
 
     /// @dev True once at least `count` actions have been recorded for `mandateId`.
-    ///      Used to check whether a propose or request step has already been executed.
     function _haveActionsBeenSubmitted(
         address org,
         uint16 mandateId,
@@ -238,11 +254,6 @@ contract InitialiseRunner is Initialise {
 
     /// @dev True when the oldest of the most recent `batchSize` proposals on `mandateId`
     ///      has passed its full deadline... both voting period and timelock elapsed.
-    ///      Checking the oldest of the batch is sufficient: all proposals in a batch
-    ///      share the same mandate conditions and are submitted in the same block.
-    ///
-    ///      Returns false if the action was submitted via request() rather than propose(),
-    ///      since request()-only mandates have no time constraint to check.
     function _isPastDeadline(
         address org,
         uint16 mandateId,
