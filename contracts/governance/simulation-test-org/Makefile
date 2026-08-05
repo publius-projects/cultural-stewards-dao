@@ -1,6 +1,7 @@
 -include ../../.env
 -include .env.local
 
+RUNNER = governance/simulation-test-org/actions/InitialiseRunner.s.sol:InitialiseRunner
 SCRIPT = governance/simulation-test-org/Deploy.s.sol:Deploy
 TEST   = SimulationTestOrg_test
 
@@ -25,7 +26,7 @@ OPT_SEPOLIA_DEPLOY_ARGS := --rpc-url $(OPT_SEPOLIA_RPC_URL) \
                             --broadcast --etherscan-api-key $(ETHERSCAN_API_KEY) \
                             --chain 11155420 --ffi -vv
 
-.PHONY: help deploy-anvil deploy-sepolia deploy-arb-sepolia deploy-opt-sepolia test setup-wallet check-wallet initialise-runner
+.PHONY: help deploy-anvil deploy-sepolia deploy-arb-sepolia deploy-opt-sepolia test run setup-wallet check-wallet initialise-runner
 
 help:
 	@echo "Available targets:"
@@ -76,12 +77,19 @@ deploy-opt-sepolia: check-wallet
 test:
 	cd ../.. && forge test --match-contract $(TEST) -vvv
 
+run:
+	cd ../.. && forge script $(RUNNER) \
+	  --sig "run(address,address,uint256,string[],uint256[])" \
+	  0xfafD74D39d241dFCe4Bd5fD6b33786da61cFb4BD 0x19F088652880D2a85FBe45cBb34A57B79435282C 1234 \
+	  '["Yin","Yang"]' '[$(TEST_ACCOUNT_KEY_1)]' \
+	  --rpc-url $(ARB_SEPOLIA_RPC_URL) --broadcast --ffi -vv
+
 initialise-runner:
 	@echo "Seed the two demo Ideas Layers ('Yin' and 'Yang') after deploying:"
 	@echo ""
 	@echo "  forge script governance/simulation-test-org/actions/InitialiseRunner.s.sol:InitialiseRunner \\"
 	@echo "    --sig \"run(address,address,uint256,string[],uint256[])\" \\"
-	@echo "    <primaryLayer> <digitalLayer> 1 '[\"Yin\",\"Yang\"]' '[]' \\"
-	@echo "    --rpc-url \$$SEPOLIA_RPC_URL --account $(DEPLOYER_ACCOUNT) --broadcast"
+	@echo "    <primaryLayer> <digitalLayer> 1 '[\"Yin\",\"Yang\"]' '[\$$TEST_ACCOUNT_KEY_1]' \\"
+	@echo "    --rpc-url \$$ARB_SEPOLIA_RPC_URL --broadcast --ffi"
 	@echo ""
 	@echo "Run it again after each voting window closes (2 minutes) until it logs 'seeding complete'."

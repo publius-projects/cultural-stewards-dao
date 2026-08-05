@@ -34,26 +34,17 @@ contract Initialise is ActionHelpers {
         vm.stopBroadcast();
     }
 
-    function unpackReformPackages(address powers, uint256 nonce, uint256[] memory privateKeys) public {
-        delete mandateSlots;
-        delete actionIds;
-
+    /// @notice Logs the mandate count of a freshly spawned layer.
+    /// @dev This replaces the former `unpackReformPackages`, which searched every new layer for
+    ///      mandates named "Reform Package <n>" and executed them. Those were produced by
+    ///      `packageInitData`, a PowersFactory helper that no longer exists in powers-monorepo —
+    ///      `PowersFactory.addMandates` now takes the full constitution directly, so no packing
+    ///      or unpacking step is involved and the search always found zero. See Spec.md's
+    ///      "Refactor Notes".
+    function reportLayerMandateCount(address powers) public {
         _loadMandateCache(Powers(payable(powers)));
-        uint16 counter = _mandateCounterCache[address(powers)];
-        for (uint16 i = 1; i < counter; i++) {
-            uint16 id = _mandateCache[address(powers)][keccak256(abi.encodePacked("Reform Package ", vm.toString(i)))];
-            if (id != 0) mandateSlots.push(id);
-        }
-
-        console2.log("Unpacking reform packages for layer: ", Powers(payable(powers)).name());
-        console2.log("Found ", mandateSlots.length, " reform packages to unpack.");
-        console2.log("total number of mandates in the layer: ", counter);
-
-        for (uint i = 0; i < mandateSlots.length; i++) {
-            vm.startBroadcast();
-            Powers(payable(powers)).request(mandateSlots[i], abi.encode(), nonce + i, "Unpacking reform package for Ideas Layer");
-            vm.stopBroadcast();
-        }
+        console2.log("Layer: ", Powers(payable(powers)).name());
+        console2.log("total number of mandates in the layer: ", _mandateCounterCache[address(powers)]);
     }
 
     /// @notice Step 1 of seeding "Yin"/"Yang": Participants initiate creation.
@@ -135,7 +126,7 @@ contract Initialise is ActionHelpers {
         for (uint i = 0; i < names.length; i++) {
             deployedIdeasLayer[i] = Powers(payable(primaryLayer)).getRoleHolderAtIndex(4, i);
             console2.log("Deployed Ideas Layer: ", names[i], ": ", deployedIdeasLayer[i]);
-            unpackReformPackages(deployedIdeasLayer[i], nonce, privateKeys);
+            reportLayerMandateCount(deployedIdeasLayer[i]);
         }
 
         console2.log("Deployed ", names.length, " Ideas Layers Successfully!");
@@ -276,7 +267,7 @@ contract Initialise is ActionHelpers {
 
         deployedConvergenceLayer = Powers(payable(primaryLayer)).getRoleHolderAtIndex(3, 0);
         console2.log("Deployed Convergence Layer: ", deployedConvergenceLayer);
-        unpackReformPackages(deployedConvergenceLayer, nonce, privateKeys);
+        reportLayerMandateCount(deployedConvergenceLayer);
         runSetupMandate(deployedConvergenceLayer, nonce, privateKeys);
 
         console2.log("Deployed Convergence Layer Successfully!");

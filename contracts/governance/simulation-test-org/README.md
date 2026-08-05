@@ -32,6 +32,31 @@ Environment variables (see `.env.example`):
   to seed initial test/demo role holders (Participants, Stewards, Assessors). Generate fresh keys
   for this purpose (`cast wallet new`) — never reuse a real wallet's key here.
 
+## Mandate versions and the registry
+
+This org resolves every mandate from the live `MandateRegistry`, whose address comes from
+`Configurations.getMandateRegistry(block.chainid)` — `0x89b77a5eD85F6D442Cf703De8A03F286266de510` on
+both Ethereum Sepolia and Arbitrum Sepolia. Mandates are pinned to **0.1.9**, the only version that
+registry holds.
+
+`Adopt_Mandates` is the one exception: it is pinned to **0.2.0**, which is what lets the reform flows
+adopt fully configured mandates with real voting conditions (0.1.9 forced every adoption to an empty
+config and zeroed conditions). It is pinned rather than resolved as "latest" on purpose — see
+`Spec.md`'s "Refactor Notes" for why.
+
+**Before deploying to a network for the first time**, make sure `Adopt_Mandates` 0.2.0 is registered
+there. Run this as the registry owner:
+
+```bash
+cd ../../lib/powers-monorepo/solidity
+forge script script/DeployMandates.s.sol:DeployMandates \
+  --rpc-url $SEPOLIA_RPC_URL --account $DEPLOYER_ACCOUNT --sender $DEPLOYER_ADDRESS --broadcast -vv
+```
+
+The script is idempotent — it skips every mandate already registered and registers only what is
+missing. Run it without `--broadcast` first to see exactly what it would touch. If this step is
+skipped, deployment fails fast with `MandateNotFound(0, 2, 0, "Adopt_Mandates")`.
+
 ## Deployment
 
 1. Copy the environment template and fill in your values:
@@ -130,8 +155,32 @@ private key constants internally (never real keys). It forks Sepolia, deploys th
 - The auto-assigned Legal Interfacer (the hardcoded demo Steward account, `hannah` in
   `DeploySetup.s.sol`) immediately requesting an allowance from the Primary Layer treasury — no
   extra nomination step required.
+- The reform flow end to end: Stewards adopting a new, fully configured mandate through
+  `Adopt_Mandates` 0.2.0 (asserting the adopted mandate keeps both its config and its conditions),
+  plus a negative test showing a Participant veto blocks the adoption.
+
+The suite registers `Adopt_Mandates` 0.2.0 on its fork if the live registry does not yet have it, so
+it passes whether or not the registration transaction described above has been broadcast.
+
+### A gotcha worth knowing when writing tests
+
+`Powers` measures `succeedAt` against the **number of role holders**, not the number of votes cast
+(`amountMembers * succeedAt <= forVotes * DENOMINATOR`). A mandate at `succeedAt = 66` whose role has
+two holders needs *both* to vote FOR. Role 3 (Legal Interfacer) at every Convergence Layer has two
+holders — `testAccount1` from the base setup and `hannah` from the demo auto-assignment — so any 66%
+flow on that role currently requires unanimity. Worth checking before a live demo depends on `hannah`
+acting alone.
 
 ## Troubleshooting
+
+**`MandateNotFound(0, 2, 0, "Adopt_Mandates")` at deploy** — `Adopt_Mandates` 0.2.0 is not registered
+on the target network. Run `DeployMandates.s.sol` as the registry owner (see "Mandate versions and the
+registry" above).
+
+**`MandateNotFound(0, 1, 9, "<name>")` at deploy** — the target network's registry does not hold the
+0.1.9 mandate set at all. Check that `Configurations.getMandateRegistry` returns a non-zero address
+for that chain and that a registry is actually deployed there; `Configurations` currently maps only
+Ethereum Sepolia and Arbitrum Sepolia.
 
 **"contract size limit" error at deploy** — if deploy fails with
 `Error: ... is above the contract size limit (31409 > 24576)`, confirm `optimizer_runs = 600`,

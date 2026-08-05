@@ -19,9 +19,12 @@ import { MandateRegistry } from "@lib/powers-monorepo/solidity/src/core/helpers/
 /// See governance/simulation-test-org/Spec.md for the full design rationale.
 abstract contract DeploySetup is DeployHelpers {
     Configurations helperConfig = new Configurations();
-    // Same registry as the original Cultural Stewardship DAO deployment — this is the live,
-    // deployed MandateRegistry on the target testnets, not something this org redeploys.
-    MandateRegistry registry = MandateRegistry(0x97b66F08Eb857e27A24492D338d3DC484DF63896);
+    // The live, deployed MandateRegistry on the target network — not something this org
+    // redeploys. Resolved from Configurations rather than hardcoded so there is a single source
+    // of truth: it returns 0x89b77a5eD85F6D442Cf703De8A03F286266de510 on both Ethereum Sepolia
+    // and Arbitrum Sepolia, and reverts on a chain where no registry is deployed (clearer than
+    // silently pointing at an address that holds no code).
+    MandateRegistry registry = MandateRegistry(helperConfig.getMandateRegistry(block.chainid));
 
     // Designated demo operator accounts (same accounts used by the original DAO's DeploySetup).
     // `hannah` is the account this org's Convergence Layer template auto-assigns as the initial
@@ -70,21 +73,51 @@ abstract contract DeploySetup is DeployHelpers {
     address internal m_StatementOfIntent;
 
     // The mandate version to be used.
-    // NB: kept at 0.1.7 to match the version actually registered and proven against the live
-    // MandateRegistry above (the same registry the original Cultural Stewardship DAO deploys
-    // against) — see the judgment-call note in this org's deployment report.
+    // NB: 0.1.9 is the only version registered in the MandateRegistry above. Versions 0.1.7 and
+    // earlier are not present there at all — a pinned lookup for them reverts with
+    // MandateNotFound. Verified against the live registry on 2026-08-04.
     uint16 constant MAJOR = 0;
     uint16 constant MINOR = 1;
-    uint16 constant PATCH = 7;
+    uint16 constant PATCH = 9;
 
     uint16 constant PACKAGE_SIZE = 7;
 
-    /// @notice Resolves a mandate at its latest registered version rather than the (MAJOR, MINOR,
-    /// PATCH) pin above. Adopt_Mandates has moved to 0.2.0 — a pinned lookup for it reverts with
-    /// MandateNotFound (or silently resolves a stale version), so every layer must use this for
-    /// Adopt_Mandates specifically.
-    function _latestMandateAddress(string memory name) internal view returns (address) {
-        (uint16 major, uint16 minor, uint16 patch) = registry.getLatestVersion(name);
-        return registry.getMandateAddress(major, minor, patch, name);
+    // Adopt_Mandates versions independently of the repo-wide pin above: it sits at 0.2.0 while
+    // every other mandate this org uses is at 0.1.9.
+    uint16 constant ADOPT_MANDATES_MAJOR = 0;
+    uint16 constant ADOPT_MANDATES_MINOR = 2;
+    uint16 constant ADOPT_MANDATES_PATCH = 0;
+
+    /// @notice The single runtime input parameter that Adopt_Mandates v0.2.0 declares.
+    /// @dev This is `PowersTypes.MandateInitData[]` written out as a tuple signature:
+    ///      (nameDescription, targetMandate, config, conditions), where conditions is
+    ///      (allowedRole, votingPeriod, timelock, throttleExecution, needFulfilled,
+    ///      needNotFulfilled, quorum, succeedAt, maxExecutionDelay). Every StatementOfIntent in a
+    ///      reform flow — the proposal, each veto, and each checkpoint — must declare exactly
+    ///      this one parameter, because `needFulfilled` matches on the action id, which is
+    ///      derived from the calldata. A propose step with a different parameter shape produces a
+    ///      different action id and can never satisfy the execute step.
+    string constant ADOPT_MANDATES_PARAM =
+        "(string,address,bytes,(uint256,uint32,uint32,uint32,uint16,uint16,uint8,uint8,uint32))[] mandateInitData";
+
+    /// @notice Resolves Adopt_Mandates at its own pinned version (0.2.0).
+    /// @dev Deliberately pinned rather than resolved via `registry.getLatestVersion`. The runtime
+    ///      calldata shape changed between 0.1.9 and 0.2.0 — 0.1.9 took
+    ///      `(address[] mandates, uint256[] roleIds)` and forced every adoption to an empty
+    ///      config and zeroed conditions. Resolving "latest" would let a future registration
+    ///      silently swap the contract underneath reform flows whose StatementOfIntent steps
+    ///      still declare the old parameter shape, which breaks them at execution rather than at
+    ///      deploy. Pinning fails loudly with MandateNotFound instead.
+    function _adoptMandatesAddress() internal view returns (address) {
+        return registry.getMandateAddress(
+            ADOPT_MANDATES_MAJOR, ADOPT_MANDATES_MINOR, ADOPT_MANDATES_PATCH, "Adopt_Mandates"
+        );
+    }
+
+    /// @notice The input-parameter array every reform-flow StatementOfIntent must be configured
+    /// with, so proposal, veto and checkpoint steps all agree with the executing Adopt_Mandates.
+    function _adoptMandatesParams() internal pure returns (string[] memory params) {
+        params = new string[](1);
+        params[0] = ADOPT_MANDATES_PARAM;
     }
 }

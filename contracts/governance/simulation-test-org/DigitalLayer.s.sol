@@ -85,7 +85,7 @@ contract DigitalLayer is DeploySetup {
     }
 
     function _initMandateAddresses() internal {
-        m_Adopt_Mandates = _latestMandateAddress("Adopt_Mandates");
+        m_Adopt_Mandates = _adoptMandatesAddress();
         m_BespokeAction_Advanced = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Advanced");
         m_BespokeAction_OnReturnValue = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_OnReturnValue");
         m_BespokeAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Simple");
@@ -500,9 +500,10 @@ contract DigitalLayer is DeploySetup {
             mandateIds: mandateIds
         }));
 
-        string[] memory adoptMandatesParams = new string[](2);
-        adoptMandatesParams[0] = "address[] mandates";
-        adoptMandatesParams[1] = "uint256[] roleIds";
+        // Adopt_Mandates v0.2.0 takes one runtime parameter: a full MandateInitData[]. Every
+        // StatementOfIntent in this flow must declare exactly the same parameter — see
+        // ADOPT_MANDATES_PARAM in DeploySetup.s.sol for why.
+        string[] memory adoptMandatesParams = _adoptMandatesParams();
 
         // Writers: initiate Adopting Mandates
         mandateCount++;

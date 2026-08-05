@@ -90,7 +90,7 @@ contract IdeasLayer is DeploySetup {
     }
 
     function _initMandateAddresses() internal {
-        m_Adopt_Mandates = _latestMandateAddress("Adopt_Mandates");
+        m_Adopt_Mandates = _adoptMandatesAddress();
         m_BespokeAction_Advanced = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Advanced");
         m_BespokeAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Simple");
         m_ElectionRegistry_CleanUpVoteMandate = registry.getMandateAddress(MAJOR, MINOR, PATCH, "ElectionRegistry_CleanUpVoteMandate");
@@ -116,7 +116,14 @@ contract IdeasLayer is DeploySetup {
         uint16 requestNewConvergenceLayerId
     ) internal {
         blocksPerHour = helperConfig.getBlocksPerHour(block.chainid);
-        mandateCount = 5; // resetting mandate count (matches original factory-template offset).
+        // Powers assigns mandate IDs from 1 upward (Powers.mandateCounter starts at 1), and
+        // PowersFactory.addMandates loads this array as the instance's entire constitution.
+        // The original DAO's offset of 5 compensated for `packageInitData`, which prepended
+        // reform-package machinery to every template; that helper no longer exists in the
+        // current powers-monorepo, so the offset is stale and must be 0. A non-zero offset
+        // makes every `needFulfilled`/`revokeMandate(mandateCount + 1)` reference point at the
+        // wrong mandate ID (see the Refactor Notes in Spec.md).
+        mandateCount = 0;
         if (m_StatementOfIntent == address(0)) _initMandateAddresses();
 
         //////////////////////////////////////////////////////////////////////
@@ -699,9 +706,10 @@ contract IdeasLayer is DeploySetup {
             mandateIds: mandateIds
         }));
 
-        inputParams = new string[](2);
-        inputParams[0] = "address[] mandates";
-        inputParams[1] = "uint256[] roleIds";
+        // Adopt_Mandates v0.2.0 takes one runtime parameter: a full MandateInitData[]. The veto
+        // StatementOfIntent must declare exactly the same parameter — see ADOPT_MANDATES_PARAM in
+        // DeploySetup.s.sol for why.
+        inputParams = _adoptMandatesParams();
 
         // Participants: Veto Adopting Mandates
         mandateCount++;

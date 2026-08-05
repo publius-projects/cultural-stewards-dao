@@ -95,7 +95,7 @@ contract ConvergenceLayer is DeploySetup {
     }
 
     function _initMandateAddresses() internal {
-        m_Adopt_Mandates = _latestMandateAddress("Adopt_Mandates");
+        m_Adopt_Mandates = _adoptMandatesAddress();
         m_BespokeAction_Advanced = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Advanced");
         m_BespokeAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "BespokeAction_Simple");
         m_ExternalAction_Simple = registry.getMandateAddress(MAJOR, MINOR, PATCH, "ExternalAction_Simple");
@@ -117,7 +117,11 @@ contract ConvergenceLayer is DeploySetup {
         uint16 requestAllowanceConvergenceLayerId
     ) internal {
         blocksPerHour = helperConfig.getBlocksPerHour(block.chainid);
-        mandateCount = 3; // resetting mandate count (matches original factory-template offset).
+        // See the note in IdeasLayer.s.sol: the original offset of 3 compensated for
+        // `packageInitData`, which no longer exists in the current powers-monorepo. Powers
+        // assigns IDs from 1, so this must start at 0 or every cross-mandate ID reference
+        // in this template is wrong.
+        mandateCount = 0;
         if (m_StatementOfIntent == address(0)) _initMandateAddresses();
         //////////////////////////////////////////////////////////////////////
         //                              SETUP                               //
@@ -423,9 +427,10 @@ contract ConvergenceLayer is DeploySetup {
             mandateIds: mandateIds
         }));
 
-        string[] memory adoptMandatesParams = new string[](2);
-        adoptMandatesParams[0] = "address[] mandates";
-        adoptMandatesParams[1] = "uint256[] roleIds";
+        // Adopt_Mandates v0.2.0 takes one runtime parameter: a full MandateInitData[]. Every
+        // StatementOfIntent in this flow must declare exactly the same parameter — see
+        // ADOPT_MANDATES_PARAM in DeploySetup.s.sol for why.
+        string[] memory adoptMandatesParams = _adoptMandatesParams();
 
         // Members: initiate Adopting Mandates
         mandateCount++;

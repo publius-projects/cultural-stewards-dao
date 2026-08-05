@@ -3,7 +3,95 @@
 > **Status:** Draft
 > **Network:** Sepolia (testnet)
 > **Design date:** 2026-08-03
+> **Last refactored:** 2026-08-04 — realigned to mandate version 0.1.9 and `Adopt_Mandates` 0.2.0; see "Refactor Notes (2026-08-04)".
 > **Derived from:** The Cultural Stewardship DAO (`governance/PrimaryLayer.s.sol`, `DigitalLayer.s.sol`, `IdeasLayer.s.sol`, `ConvergenceLayer.s.sol`), with all identity-verification and token/tokenomics mandates removed or replaced.
+
+---
+
+## Refactor Notes (2026-08-04)
+
+This org was realigned to the mandate set currently deployed in the `MandateRegistry` at
+`0x89b77a5eD85F6D442Cf703De8A03F286266de510` (the same address on Ethereum Sepolia and Arbitrum
+Sepolia, resolved via `Configurations.getMandateRegistry`). Four changes, plus their consequences.
+
+### 1. Mandate version moved from 0.1.7 to 0.1.9
+
+The registry holds **only** version 0.1.9. Versions 0.1.7 and earlier are not present at all, so
+every pinned lookup reverted with `MandateNotFound` and the org could not deploy. `DeploySetup.s.sol`
+now pins `PATCH = 9`.
+
+The local `powers-monorepo` checkout under `contracts/lib/` was verified to *be* the deployed 0.1.9
+source: the compiled bytecode of each mandate matches the deployed contract byte-for-byte apart from
+each contract's immutable registry address and its trailing metadata hash. The local source is
+therefore a reliable reference for config shapes and runtime parameters.
+
+### 2. `Adopt_Mandates` upgraded to 0.2.0, and pinned rather than resolved as "latest"
+
+`Adopt_Mandates` versions independently of every other mandate. Version **0.1.9** takes
+`(address[] mandates, uint256[] roleIds)` and forces every adoption to an empty config, zeroed
+conditions and the fixed name "Reform mandate" — meaning it can only adopt mandates that need no
+configuration and no vote, which made the reform flows in all four layers close to decorative.
+Version **0.2.0** takes a full `MandateInitData[]` and passes name, target, config and conditions
+through unmodified.
+
+All four layers' reform flows are now wired to 0.2.0. Every `StatementOfIntent` in a reform flow —
+the proposal, each veto, and each of the Primary Layer's three checkpoints — declares the single
+parameter `ADOPT_MANDATES_PARAM` (defined in `DeploySetup.s.sol`), because `needFulfilled` matches on
+an action id derived from the calldata: a propose step with a different parameter shape produces a
+different action id and could never satisfy the execute step.
+
+The address is resolved by `_adoptMandatesAddress()`, **pinned** to 0.2.0, deliberately replacing the
+previous `registry.getLatestVersion` call. Resolving "latest" would let a future registration swap the
+contract underneath reform flows still declaring the old parameter shape — a failure that would
+surface at execution rather than at deploy. The pin fails loudly with `MandateNotFound` instead.
+
+> **Deployment prerequisite:** `Adopt_Mandates` 0.2.0 must be registered in the target registry before
+> this org can deploy. Run `script/DeployMandates.s.sol` from `lib/powers-monorepo/solidity` as the
+> registry owner; it is idempotent and will register only what is missing.
+
+### 3. Stale factory-template offsets corrected (this was a live bug)
+
+`IdeasLayer.s.sol` and `ConvergenceLayer.s.sol` started their mandate counters at `5` and `3`. That
+offset compensated for `packageInitData`, a `PowersFactory` helper that prepended reform-package
+machinery to every template. It no longer exists — `PowersFactory.addMandates` now takes the full
+constitution directly, and Powers assigns mandate IDs from 1 upward.
+
+With the offset left in, **every cross-mandate reference in those two templates pointed at the wrong
+mandate**: each `needFulfilled`, and each self-revoking `revokeMandate(mandateCount + 1)` in the setup
+mandates. Concretely, the Ideas Layer's "Assess and Assign Participant" step waited on mandate 8 while
+the application it was meant to approve was mandate 3, so no Participant could ever be admitted. Both
+counters now start at `0`.
+
+The same removal made `unpackReformPackages` in `actions/Initialise.s.sol` dead — it searched each new
+layer for mandates named "Reform Package <n>", which can no longer be created, and always found zero.
+It has been replaced by `reportLayerMandateCount`, which just logs the layer's mandate count.
+
+### 4. Registry address resolved from `Configurations`
+
+`DeploySetup.s.sol` previously hardcoded the registry address. It now calls
+`helperConfig.getMandateRegistry(block.chainid)`, giving a single source of truth and a clear revert on
+a chain where no registry is deployed, rather than silently pointing at an address holding no code.
+
+### Behaviour worth knowing: `succeedAt` is measured against role holders
+
+`Powers._voteSucceeded` evaluates `amountMembers * succeedAt <= forVotes * DENOMINATOR` — the
+denominator is the **number of role holders at proposal time**, not the number of votes cast. A
+mandate at `succeedAt = 66` with two role holders therefore requires *both* to vote FOR; one FOR vote
+and one abstention fails. This is not a change, but it was not previously documented and it caused two
+misleading test failures during this refactor.
+
+It has a practical consequence for the demo: role 3 (Legal Interfacer) at every Convergence Layer has
+**two** holders — `testAccount1` from the base setup and `hannah` from the demo auto-assignment
+described below — so the 66% flows on that role need unanimity. If a live demo should be passable by
+`hannah` alone, either drop `succeedAt` on those mandates or stop assigning `testAccount1` to role 3.
+
+### Test coverage added
+
+The reform flow had **no test**, which is why the offset bug survived. Two were added:
+`test_ReformFlow_AdoptsConfiguredMandate` (asserts the adopted mandate keeps its config *and* its
+conditions — the capability 0.1.9 lacked) and `test_ReformFlow_BlockedByParticipantVeto`. The suite
+registers `Adopt_Mandates` 0.2.0 on the fork if the live registry does not yet have it, so it passes
+both before and after the real registration transaction.
 
 ---
 
@@ -262,5 +350,5 @@ This org mirrors the original Cultural Stewardship DAO's **multi-file deploy pat
 - `governance/simulation-test-org/Makefile`
 - `governance/simulation-test-org/.env.example`
 
-**Mandate version:** MAJOR=0, MINOR=1, PATCH=9 (except `Adopt_Mandates`, resolved via `getLatestVersion`), matching `DeploySetup.s.sol`'s existing `0.1.7` cache-versioning convention where it differs.
+**Mandate version:** MAJOR=0, MINOR=1, PATCH=9 — the only version present in the target registry. `Adopt_Mandates` is the sole exception, pinned to 0.2.0 via `_adoptMandatesAddress()`. See "Refactor Notes (2026-08-04)".
 **Mandate `nameDescription` strings must match exactly across all files** that reference them (deploy scripts, actions, runners).
