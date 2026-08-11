@@ -1,0 +1,29 @@
+{
+  "icon": "",
+  "banner": "https://aqua-famous-sailfish-288.mypinata.cloud/ipfs/bafybeidicp7shq7ryief2qxarezz6bpnrnlim4hcqeqfp2jlvfwobb2ppa/digitalLayer.png",
+  "description":
+    "Manages code repositories, commits, and digital representation of the organisation and its layers. Carried over unchanged from the original Cultural Stewardship Experiment — it never used tokens or ZKPassport. The Primary Layer holds some veto powers over this Layer.",
+  "website": "https://enterhere.io",
+  "codeOfConduct": "https://github.com/publius-projects/powers-monorepo/blob/main/CODE_OF_CONDUCT.md", 
+  "disputeResolution": "",
+  "xmtpAgentAddress": "0xe65d5d40c878339596423b929058a13147f925e1",
+  "communicationChannels": {
+      "discord": "",
+      "telegram": "",
+      "x": "",
+      "paragraph": "",
+      "youtube": "",
+      "facebook": "",
+      "github": "https://github.com/publius-projects/cultural-stewards",
+      "forum": "",
+      "documentation": ""
+  },
+  "parentContracts": [ 
+    {
+      "title": "Primary Layer",
+      "address": ""
+    }
+  ],
+  "childContracts": [ ],
+  "attributes": [ ]
+}
