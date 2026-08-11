@@ -1,0 +1,29 @@
+{
+  "icon": "",
+  "banner": "https://aqua-famous-sailfish-288.mypinata.cloud/ipfs/bafybeidicp7shq7ryief2qxarezz6bpnrnlim4hcqeqfp2jlvfwobb2ppa/ideasLayer.png",
+  "description":
+    "A space for ideation and concept development. It is initiated by the Primary Layer and can spawn Convergence Layers. Two Ideas Layers, named 'Yin' and 'Yang', are pre-seeded at deployment so a joining member has a real choice from the first live action. Membership is a governance-approved application rather than token-gated, and there is no ZKPassport identity check anywhere in this layer.",
+  "website": "https://enterhere.io",
+  "codeOfConduct": "https://github.com/publius-projects/powers-monorepo/blob/main/CODE_OF_CONDUCT.md", 
+  "disputeResolution": "",
+  "xmtpAgentAddress": "0xe65d5d40c878339596423b929058a13147f925e1",
+  "communicationChannels": {
+      "discord": "",
+      "telegram": "",
+      "x": "",
+      "paragraph": "",
+      "youtube": "",
+      "facebook": "",
+      "github": "https://github.com/publius-projects/cultural-stewards",
+      "forum": "",
+      "documentation": ""
+  },
+  "parentContracts": [ 
+    {
+      "title": "Primary Layer",
+      "address": ""
+    }
+  ],
+  "childContracts": [ ],
+  "attributes": [ ]
+}
